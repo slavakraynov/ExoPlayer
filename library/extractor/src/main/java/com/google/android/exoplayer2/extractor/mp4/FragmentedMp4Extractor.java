@@ -74,7 +74,8 @@ public class FragmentedMp4Extractor implements Extractor {
   /**
    * Flags controlling the behavior of the extractor. Possible flag values are {@link
    * #FLAG_WORKAROUND_EVERY_VIDEO_FRAME_IS_SYNC_FRAME}, {@link #FLAG_WORKAROUND_IGNORE_TFDT_BOX},
-   * {@link #FLAG_ENABLE_EMSG_TRACK} and {@link #FLAG_WORKAROUND_IGNORE_EDIT_LISTS}.
+   * {@link #FLAG_ENABLE_EMSG_TRACK} and {@link #FLAG_WORKAROUND_IGNORE_EDIT_LISTS}
+   * and {@link #FLAG_WORKAROUND_IGNORE_SIDX}.
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
@@ -84,7 +85,8 @@ public class FragmentedMp4Extractor implements Extractor {
         FLAG_WORKAROUND_EVERY_VIDEO_FRAME_IS_SYNC_FRAME,
         FLAG_WORKAROUND_IGNORE_TFDT_BOX,
         FLAG_ENABLE_EMSG_TRACK,
-        FLAG_WORKAROUND_IGNORE_EDIT_LISTS
+        FLAG_WORKAROUND_IGNORE_EDIT_LISTS,
+        FLAG_WORKAROUND_IGNORE_SIDX
       })
   public @interface Flags {}
   /**
@@ -105,6 +107,9 @@ public class FragmentedMp4Extractor implements Extractor {
 
   /** Flag to ignore any edit lists in the stream. */
   public static final int FLAG_WORKAROUND_IGNORE_EDIT_LISTS = 1 << 4; // 16
+
+  /** Flag to ignore any sidx field. */
+  public static final int FLAG_WORKAROUND_IGNORE_SIDX = 1 << 5; // 32
 
   private static final String TAG = "FragmentedMp4Extractor";
 
@@ -463,7 +468,7 @@ public class FragmentedMp4Extractor implements Extractor {
   private void onLeafAtomRead(LeafAtom leaf, long inputPosition) throws ParserException {
     if (!containerAtoms.isEmpty()) {
       containerAtoms.peek().add(leaf);
-    } else if (leaf.type == Atom.TYPE_sidx) {
+    } else if ((flags & FLAG_WORKAROUND_IGNORE_SIDX) == 0 && leaf.type == Atom.TYPE_sidx) {
       Pair<Long, ChunkIndex> result = parseSidx(leaf.data, inputPosition);
       segmentIndexEarliestPresentationTimeUs = result.first;
       extractorOutput.seekMap(result.second);
