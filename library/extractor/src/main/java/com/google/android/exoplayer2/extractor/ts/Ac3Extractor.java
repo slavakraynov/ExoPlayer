@@ -31,7 +31,15 @@ import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerat
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import java.io.IOException;
 
-/** Extracts data from (E-)AC-3 bitstreams. */
+/**
+ * Extracts data from (E-)AC-3 bitstreams.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class Ac3Extractor implements Extractor {
 
   /** Factory for {@link Ac3Extractor} instances. */
@@ -42,6 +50,7 @@ public final class Ac3Extractor implements Extractor {
    * up.
    */
   private static final int MAX_SNIFF_BYTES = 8 * 1024;
+
   private static final int AC3_SYNC_WORD = 0x0B77;
   private static final int MAX_SYNC_FRAME_SIZE = 2786;
 
@@ -142,5 +151,4 @@ public final class Ac3Extractor implements Extractor {
     reader.consume(sampleData);
     return RESULT_CONTINUE;
   }
-
 }

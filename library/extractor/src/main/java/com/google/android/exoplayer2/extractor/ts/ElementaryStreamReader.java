@@ -20,12 +20,18 @@ import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 
-/** Extracts individual samples from an elementary media stream, preserving original order. */
+/**
+ * Extracts individual samples from an elementary media stream, preserving original order.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public interface ElementaryStreamReader {
 
-  /**
-   * Notifies the reader that a seek has occurred.
-   */
+  /** Notifies the reader that a seek has occurred. */
   void seek();
 
   /**
@@ -53,9 +59,6 @@ public interface ElementaryStreamReader {
    */
   void consume(ParsableByteArray data) throws ParserException;
 
-  /**
-   * Called when a packet ends.
-   */
+  /** Called when a packet ends. */
   void packetFinished();
-
 }

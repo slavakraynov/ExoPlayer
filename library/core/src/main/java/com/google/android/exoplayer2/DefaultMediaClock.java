@@ -22,9 +22,15 @@ import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.StandaloneMediaClock;
 
 /**
- * Default {@link MediaClock} which uses a renderer media clock and falls back to a
- * {@link StandaloneMediaClock} if necessary.
+ * Default {@link MediaClock} which uses a renderer media clock and falls back to a {@link
+ * StandaloneMediaClock} if necessary.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class DefaultMediaClock implements MediaClock {
 
   /** Listener interface to be notified of changes to the active playback parameters. */
@@ -60,17 +66,13 @@ import com.google.android.exoplayer2.util.StandaloneMediaClock;
     isUsingStandaloneClock = true;
   }
 
-  /**
-   * Starts the standalone fallback clock.
-   */
+  /** Starts the standalone fallback clock. */
   public void start() {
     standaloneClockIsStarted = true;
     standaloneClock.start();
   }
 
-  /**
-   * Stops the standalone fallback clock.
-   */
+  /** Stops the standalone fallback clock. */
   public void stop() {
     standaloneClockIsStarted = false;
     standaloneClock.stop();

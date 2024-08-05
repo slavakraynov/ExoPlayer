@@ -16,15 +16,16 @@
 package com.google.android.exoplayer2.source.dash;
 
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.util.Pair;
 import android.util.SparseArray;
-import android.util.SparseIntArray;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.SeekParameters;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.offline.StreamKey;
@@ -49,25 +50,37 @@ import com.google.android.exoplayer2.source.dash.manifest.Period;
 import com.google.android.exoplayer2.source.dash.manifest.Representation;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.Allocator;
+import com.google.android.exoplayer2.upstream.CmcdConfiguration;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
-/** A DASH {@link MediaPeriod}. */
+/**
+ * A DASH {@link MediaPeriod}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class DashMediaPeriod
     implements MediaPeriod,
         SequenceableLoader.Callback<ChunkSampleStream<DashChunkSource>>,
@@ -82,8 +95,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   /* package */ final int id;
   private final DashChunkSource.Factory chunkSourceFactory;
   @Nullable private final TransferListener transferListener;
+  @Nullable private final CmcdConfiguration cmcdConfiguration;
   private final DrmSessionManager drmSessionManager;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
+  private final BaseUrlExclusionList baseUrlExclusionList;
   private final long elapsedRealtimeOffsetMs;
   private final LoaderErrorThrower manifestLoaderErrorThrower;
   private final Allocator allocator;
@@ -95,6 +110,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       trackEmsgHandlerBySampleStream;
   private final MediaSourceEventListener.EventDispatcher mediaSourceEventDispatcher;
   private final DrmSessionEventListener.EventDispatcher drmEventDispatcher;
+  private final PlayerId playerId;
 
   @Nullable private Callback callback;
   private ChunkSampleStream<DashChunkSource>[] sampleStreams;
@@ -107,9 +123,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   public DashMediaPeriod(
       int id,
       DashManifest manifest,
+      BaseUrlExclusionList baseUrlExclusionList,
       int periodIndex,
       DashChunkSource.Factory chunkSourceFactory,
       @Nullable TransferListener transferListener,
+      @Nullable CmcdConfiguration cmcdConfiguration,
       DrmSessionManager drmSessionManager,
       DrmSessionEventListener.EventDispatcher drmEventDispatcher,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
@@ -118,12 +136,15 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       LoaderErrorThrower manifestLoaderErrorThrower,
       Allocator allocator,
       CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory,
-      PlayerEmsgCallback playerEmsgCallback) {
+      PlayerEmsgCallback playerEmsgCallback,
+      PlayerId playerId) {
     this.id = id;
     this.manifest = manifest;
+    this.baseUrlExclusionList = baseUrlExclusionList;
     this.periodIndex = periodIndex;
     this.chunkSourceFactory = chunkSourceFactory;
     this.transferListener = transferListener;
+    this.cmcdConfiguration = cmcdConfiguration;
     this.drmSessionManager = drmSessionManager;
     this.drmEventDispatcher = drmEventDispatcher;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
@@ -132,6 +153,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
     this.allocator = allocator;
     this.compositeSequenceableLoaderFactory = compositeSequenceableLoaderFactory;
+    this.playerId = playerId;
     playerEmsgHandler = new PlayerEmsgHandler(manifest, playerEmsgCallback, allocator);
     sampleStreams = newSampleStreamArray(0);
     eventSampleStreams = new EventSampleStream[0];
@@ -537,7 +559,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
    */
   private static int[][] getGroupedAdaptationSetIndices(List<AdaptationSet> adaptationSets) {
     int adaptationSetCount = adaptationSets.size();
-    SparseIntArray adaptationSetIdToIndex = new SparseIntArray(adaptationSetCount);
+    HashMap<Long, Integer> adaptationSetIdToIndex =
+        Maps.newHashMapWithExpectedSize(adaptationSetCount);
     List<List<Integer>> adaptationSetGroupedIndices = new ArrayList<>(adaptationSetCount);
     SparseArray<List<Integer>> adaptationSetIndexToGroupedIndices =
         new SparseArray<>(adaptationSetCount);
@@ -565,10 +588,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         trickPlayProperty = findTrickPlayProperty(adaptationSet.supplementalProperties);
       }
       if (trickPlayProperty != null) {
-        int mainAdaptationSetId = Integer.parseInt(trickPlayProperty.value);
-        int mainAdaptationSetIndex =
-            adaptationSetIdToIndex.get(mainAdaptationSetId, /* valueIfKeyNotFound= */ -1);
-        if (mainAdaptationSetIndex != -1) {
+        long mainAdaptationSetId = Long.parseLong(trickPlayProperty.value);
+        @Nullable Integer mainAdaptationSetIndex = adaptationSetIdToIndex.get(mainAdaptationSetId);
+        if (mainAdaptationSetIndex != null) {
           mergedGroupIndex = mainAdaptationSetIndex;
         }
       }
@@ -582,11 +604,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         if (adaptationSetSwitchingProperty != null) {
           String[] otherAdaptationSetIds = Util.split(adaptationSetSwitchingProperty.value, ",");
           for (String adaptationSetId : otherAdaptationSetIds) {
-            int otherAdaptationSetId =
-                adaptationSetIdToIndex.get(
-                    Integer.parseInt(adaptationSetId), /* valueIfKeyNotFound= */ -1);
-            if (otherAdaptationSetId != -1) {
-              mergedGroupIndex = min(mergedGroupIndex, otherAdaptationSetId);
+            @Nullable
+            Integer otherAdaptationSetIndex =
+                adaptationSetIdToIndex.get(Long.parseLong(adaptationSetId));
+            if (otherAdaptationSetIndex != null) {
+              mergedGroupIndex = min(mergedGroupIndex, otherAdaptationSetIndex);
             }
           }
         }
@@ -664,18 +686,21 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       Format[] formats = new Format[representations.size()];
       for (int j = 0; j < formats.length; j++) {
         Format format = representations.get(j).format;
-        formats[j] =
-            format.copyWithExoMediaCryptoType(drmSessionManager.getExoMediaCryptoType(format));
+        formats[j] = format.copyWithCryptoType(drmSessionManager.getCryptoType(format));
       }
 
       AdaptationSet firstAdaptationSet = adaptationSets.get(adaptationSetIndices[0]);
+      String trackGroupId =
+          firstAdaptationSet.id != AdaptationSet.ID_UNSET
+              ? Long.toString(firstAdaptationSet.id)
+              : ("unset:" + i);
       int primaryTrackGroupIndex = trackGroupCount++;
       int eventMessageTrackGroupIndex =
           primaryGroupHasEventMessageTrackFlags[i] ? trackGroupCount++ : C.INDEX_UNSET;
       int closedCaptionTrackGroupIndex =
           primaryGroupClosedCaptionTrackFormats[i].length != 0 ? trackGroupCount++ : C.INDEX_UNSET;
 
-      trackGroups[primaryTrackGroupIndex] = new TrackGroup(formats);
+      trackGroups[primaryTrackGroupIndex] = new TrackGroup(trackGroupId, formats);
       trackGroupInfos[primaryTrackGroupIndex] =
           TrackGroupInfo.primaryTrack(
               firstAdaptationSet.type,
@@ -684,18 +709,20 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
               eventMessageTrackGroupIndex,
               closedCaptionTrackGroupIndex);
       if (eventMessageTrackGroupIndex != C.INDEX_UNSET) {
+        String eventMessageTrackGroupId = trackGroupId + ":emsg";
         Format format =
             new Format.Builder()
-                .setId(firstAdaptationSet.id + ":emsg")
+                .setId(eventMessageTrackGroupId)
                 .setSampleMimeType(MimeTypes.APPLICATION_EMSG)
                 .build();
-        trackGroups[eventMessageTrackGroupIndex] = new TrackGroup(format);
+        trackGroups[eventMessageTrackGroupIndex] = new TrackGroup(eventMessageTrackGroupId, format);
         trackGroupInfos[eventMessageTrackGroupIndex] =
             TrackGroupInfo.embeddedEmsgTrack(adaptationSetIndices, primaryTrackGroupIndex);
       }
       if (closedCaptionTrackGroupIndex != C.INDEX_UNSET) {
+        String closedCaptionTrackGroupId = trackGroupId + ":cc";
         trackGroups[closedCaptionTrackGroupIndex] =
-            new TrackGroup(primaryGroupClosedCaptionTrackFormats[i]);
+            new TrackGroup(closedCaptionTrackGroupId, primaryGroupClosedCaptionTrackFormats[i]);
         trackGroupInfos[closedCaptionTrackGroupIndex] =
             TrackGroupInfo.embeddedClosedCaptionTrack(adaptationSetIndices, primaryTrackGroupIndex);
       }
@@ -715,7 +742,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
               .setId(eventStream.id())
               .setSampleMimeType(MimeTypes.APPLICATION_EMSG)
               .build();
-      trackGroups[existingTrackGroupCount] = new TrackGroup(format);
+      String uniqueTrackGroupId = eventStream.id() + ":" + i;
+      trackGroups[existingTrackGroupCount] = new TrackGroup(uniqueTrackGroupId, format);
       trackGroupInfos[existingTrackGroupCount++] = TrackGroupInfo.mpdEventTrack(i);
     }
   }
@@ -766,6 +794,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         chunkSourceFactory.createDashChunkSource(
             manifestLoaderErrorThrower,
             manifest,
+            baseUrlExclusionList,
             periodIndex,
             trackGroupInfo.adaptationSetIndices,
             selection,
@@ -774,7 +803,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             enableEventMessageTrack,
             embeddedClosedCaptionTrackFormats,
             trackPlayerEmsgHandler,
-            transferListener);
+            transferListener,
+            playerId,
+            cmcdConfiguration);
     ChunkSampleStream<DashChunkSource> stream =
         new ChunkSampleStream<>(
             trackGroupInfo.trackType,
@@ -896,6 +927,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
     @Documented
     @Retention(RetentionPolicy.SOURCE)
+    @Target(TYPE_USE)
     @IntDef({CATEGORY_PRIMARY, CATEGORY_EMBEDDED, CATEGORY_MANIFEST_EVENTS})
     public @interface TrackGroupCategory {}
 
@@ -918,8 +950,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     private static final int CATEGORY_MANIFEST_EVENTS = 2;
 
     public final int[] adaptationSetIndices;
-    public final int trackType;
-    @TrackGroupCategory public final int trackGroupCategory;
+    public final @C.TrackType int trackType;
+    public final @TrackGroupCategory int trackGroupCategory;
 
     public final int eventStreamGroupIndex;
     public final int primaryTrackGroupIndex;
@@ -978,7 +1010,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     }
 
     private TrackGroupInfo(
-        int trackType,
+        @C.TrackType int trackType,
         @TrackGroupCategory int trackGroupCategory,
         int[] adaptationSetIndices,
         int primaryTrackGroupIndex,

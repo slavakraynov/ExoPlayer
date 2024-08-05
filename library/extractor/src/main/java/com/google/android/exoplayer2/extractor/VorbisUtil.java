@@ -15,13 +15,30 @@
  */
 package com.google.android.exoplayer2.extractor;
 
+import android.util.Base64;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
+import com.google.android.exoplayer2.metadata.Metadata;
+import com.google.android.exoplayer2.metadata.Metadata.Entry;
+import com.google.android.exoplayer2.metadata.flac.PictureFrame;
+import com.google.android.exoplayer2.metadata.vorbis.VorbisComment;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
+import com.google.android.exoplayer2.util.Util;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
-/** Utility methods for parsing Vorbis streams. */
+/**
+ * Utility methods for parsing Vorbis streams.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class VorbisUtil {
 
   /** Vorbis comment header. */
@@ -41,8 +58,8 @@ public final class VorbisUtil {
   /**
    * Vorbis identification header.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-630004.2.2">Vorbis
-   *     spec/Identification header</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-630004.2.2">Vorbis
+   * spec/Identification header</a>
    */
   public static final class VorbisIdHeader {
 
@@ -124,8 +141,9 @@ public final class VorbisUtil {
   /**
    * Returns ilog(x), which is the index of the highest set bit in {@code x}.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-1190009.2.1">
-   *     Vorbis spec</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-1190009.2.1">Vorbis
+   * spec</a>
+   *
    * @param x the value of which the ilog should be calculated.
    * @return ilog(x)
    */
@@ -141,8 +159,9 @@ public final class VorbisUtil {
   /**
    * Reads a Vorbis identification header from {@code headerData}.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-630004.2.2">Vorbis
-   *     spec/Identification header</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-630004.2.2">Vorbis
+   * spec/Identification header</a>
+   *
    * @param headerData a {@link ParsableByteArray} wrapping the header data.
    * @return a {@link VorbisUtil.VorbisIdHeader} with meta data.
    * @throws ParserException thrown if invalid capture pattern is detected.
@@ -191,8 +210,9 @@ public final class VorbisUtil {
   /**
    * Reads a Vorbis comment header.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-640004.2.3">Vorbis
-   *     spec/Comment header</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-640004.2.3">Vorbis
+   * spec/Comment header</a>
+   *
    * @param headerData A {@link ParsableByteArray} wrapping the header data.
    * @return A {@link VorbisUtil.CommentHeader} with all the comments.
    * @throws ParserException If an error occurs parsing the comment header.
@@ -208,8 +228,9 @@ public final class VorbisUtil {
    *
    * <p>The data provided may not contain the Vorbis metadata common header and the framing bit.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-640004.2.3">Vorbis
-   *     spec/Comment header</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-640004.2.3">Vorbis
+   * spec/Comment header</a>
+   *
    * @param headerData A {@link ParsableByteArray} wrapping the header data.
    * @param hasMetadataHeader Whether the {@code headerData} contains a Vorbis metadata common
    *     header preceding the comment header.
@@ -241,10 +262,50 @@ public final class VorbisUtil {
       length += comments[i].length();
     }
     if (hasFramingBit && (headerData.readUnsignedByte() & 0x01) == 0) {
-      throw new ParserException("framing bit expected to be set");
+      throw ParserException.createForMalformedContainer(
+          "framing bit expected to be set", /* cause= */ null);
     }
     length += 1;
     return new CommentHeader(vendor, comments, length);
+  }
+
+  /**
+   * Builds a {@link Metadata} instance from a list of Vorbis Comments.
+   *
+   * <p>METADATA_BLOCK_PICTURE comments will be transformed into {@link PictureFrame} entries. All
+   * others will be transformed into {@link VorbisComment} entries.
+   *
+   * @param vorbisComments The raw input of comments, as a key-value pair KEY=VAL.
+   * @return The fully parsed Metadata instance. Null if no vorbis comments could be parsed.
+   */
+  @Nullable
+  public static Metadata parseVorbisComments(List<String> vorbisComments) {
+    List<Entry> metadataEntries = new ArrayList<>();
+    for (int i = 0; i < vorbisComments.size(); i++) {
+      String vorbisComment = vorbisComments.get(i);
+      String[] keyAndValue = Util.splitAtFirst(vorbisComment, "=");
+      if (keyAndValue.length != 2) {
+        Log.w(TAG, "Failed to parse Vorbis comment: " + vorbisComment);
+        continue;
+      }
+
+      if (keyAndValue[0].equals("METADATA_BLOCK_PICTURE")) {
+        // This tag is a special cover art tag, outlined by
+        // https://wiki.xiph.org/index.php/VorbisComment#Cover_art.
+        // Decode it from Base64 and transform it into a PictureFrame.
+        try {
+          byte[] decoded = Base64.decode(keyAndValue[1], Base64.DEFAULT);
+          metadataEntries.add(PictureFrame.fromPictureBlock(new ParsableByteArray(decoded)));
+        } catch (RuntimeException e) {
+          Log.w(TAG, "Failed to parse vorbis picture", e);
+        }
+      } else {
+        VorbisComment entry = new VorbisComment(keyAndValue[0], keyAndValue[1]);
+        metadataEntries.add(entry);
+      }
+    }
+
+    return metadataEntries.isEmpty() ? null : new Metadata(metadataEntries);
   }
 
   /**
@@ -263,7 +324,8 @@ public final class VorbisUtil {
       if (quiet) {
         return false;
       } else {
-        throw new ParserException("too short header: " + header.bytesLeft());
+        throw ParserException.createForMalformedContainer(
+            "too short header: " + header.bytesLeft(), /* cause= */ null);
       }
     }
 
@@ -271,7 +333,8 @@ public final class VorbisUtil {
       if (quiet) {
         return false;
       } else {
-        throw new ParserException("expected header type " + Integer.toHexString(headerType));
+        throw ParserException.createForMalformedContainer(
+            "expected header type " + Integer.toHexString(headerType), /* cause= */ null);
       }
     }
 
@@ -284,7 +347,8 @@ public final class VorbisUtil {
       if (quiet) {
         return false;
       } else {
-        throw new ParserException("expected characters 'vorbis'");
+        throw ParserException.createForMalformedContainer(
+            "expected characters 'vorbis'", /* cause= */ null);
       }
     }
     return true;
@@ -295,8 +359,9 @@ public final class VorbisUtil {
    * That's why we need to partially decode or at least read the entire setup header to know where
    * to start reading the modes.
    *
-   * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-650004.2.4">Vorbis
-   *     spec/Setup header</a>
+   * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-650004.2.4">Vorbis
+   * spec/Setup header</a>
+   *
    * @param headerData a {@link ParsableByteArray} containing setup header data.
    * @param channels the number of channels.
    * @return an array of {@link Mode}s.
@@ -313,13 +378,14 @@ public final class VorbisUtil {
     bitArray.skipBits(headerData.getPosition() * 8);
 
     for (int i = 0; i < numberOfBooks; i++) {
-      readBook(bitArray);
+      skipBook(bitArray);
     }
 
     int timeCount = bitArray.readBits(6) + 1;
     for (int i = 0; i < timeCount; i++) {
       if (bitArray.readBits(16) != 0x00) {
-        throw new ParserException("placeholder of time domain transforms not zeroed out");
+        throw ParserException.createForMalformedContainer(
+            "placeholder of time domain transforms not zeroed out", /* cause= */ null);
       }
     }
     readFloors(bitArray);
@@ -328,7 +394,8 @@ public final class VorbisUtil {
 
     Mode[] modes = readModes(bitArray);
     if (!bitArray.readBit()) {
-      throw new ParserException("framing bit after modes not set as expected");
+      throw ParserException.createForMalformedContainer(
+          "framing bit after modes not set as expected", /* cause= */ null);
     }
     return modes;
   }
@@ -346,8 +413,7 @@ public final class VorbisUtil {
     return modes;
   }
 
-  private static void readMappings(int channels, VorbisBitArray bitArray)
-      throws ParserException {
+  private static void readMappings(int channels, VorbisBitArray bitArray) throws ParserException {
     int mappingsCount = bitArray.readBits(6) + 1;
     for (int i = 0; i < mappingsCount; i++) {
       int mappingType = bitArray.readBits(16);
@@ -372,7 +438,8 @@ public final class VorbisUtil {
           couplingSteps = 0;
         }*/
       if (bitArray.readBits(2) != 0x00) {
-        throw new ParserException("to reserved bits must be zero after mapping coupling steps");
+        throw ParserException.createForMalformedContainer(
+            "to reserved bits must be zero after mapping coupling steps", /* cause= */ null);
       }
       if (submaps > 1) {
         for (int j = 0; j < channels; j++) {
@@ -392,7 +459,8 @@ public final class VorbisUtil {
     for (int i = 0; i < residueCount; i++) {
       int residueType = bitArray.readBits(16);
       if (residueType > 2) {
-        throw new ParserException("residueType greater than 2 is not decodable");
+        throw ParserException.createForMalformedContainer(
+            "residueType greater than 2 is not decodable", /* cause= */ null);
       } else {
         bitArray.skipBits(24); // begin
         bitArray.skipBits(24); // end
@@ -425,7 +493,7 @@ public final class VorbisUtil {
       int floorType = bitArray.readBits(16);
       switch (floorType) {
         case 0:
-          bitArray.skipBits(8); //order
+          bitArray.skipBits(8); // order
           bitArray.skipBits(16); // rate
           bitArray.skipBits(16); // barkMapSize
           bitArray.skipBits(6); // amplitudeBits
@@ -468,48 +536,44 @@ public final class VorbisUtil {
           }
           break;
         default:
-          throw new ParserException("floor type greater than 1 not decodable: " + floorType);
+          throw ParserException.createForMalformedContainer(
+              "floor type greater than 1 not decodable: " + floorType, /* cause= */ null);
       }
     }
   }
 
-  private static CodeBook readBook(VorbisBitArray bitArray) throws ParserException {
+  private static void skipBook(VorbisBitArray bitArray) throws ParserException {
     if (bitArray.readBits(24) != 0x564342) {
-      throw new ParserException("expected code book to start with [0x56, 0x43, 0x42] at "
-          + bitArray.getPosition());
+      throw ParserException.createForMalformedContainer(
+          "expected code book to start with [0x56, 0x43, 0x42] at " + bitArray.getPosition(),
+          /* cause= */ null);
     }
     int dimensions = bitArray.readBits(16);
     int entries = bitArray.readBits(24);
-    long[] lengthMap = new long[entries];
 
     boolean isOrdered = bitArray.readBit();
     if (!isOrdered) {
       boolean isSparse = bitArray.readBit();
-      for (int i = 0; i < lengthMap.length; i++) {
+      for (int i = 0; i < entries; i++) {
         if (isSparse) {
           if (bitArray.readBit()) {
-            lengthMap[i] = (long) (bitArray.readBits(5) + 1);
-          } else { // entry unused
-            lengthMap[i] = 0;
+            bitArray.skipBits(5); // lengthMap entry
           }
         } else { // not sparse
-          lengthMap[i] = (long) (bitArray.readBits(5) + 1);
+          bitArray.skipBits(5); // lengthMap entry
         }
       }
     } else {
-      int length = bitArray.readBits(5) + 1;
-      for (int i = 0; i < lengthMap.length;) {
-        int num = bitArray.readBits(iLog(entries - i));
-        for (int j = 0; j < num && i < lengthMap.length; i++, j++) {
-          lengthMap[i] = length;
-        }
-        length++;
+      bitArray.skipBits(5); // length
+      for (int i = 0; i < entries; ) {
+        i += bitArray.readBits(iLog(entries - i)); // num
       }
     }
 
     int lookupType = bitArray.readBits(4);
     if (lookupType > 2) {
-      throw new ParserException("lookup type greater than 2 not decodable: " + lookupType);
+      throw ParserException.createForMalformedContainer(
+          "lookup type greater than 2 not decodable: " + lookupType, /* cause= */ null);
     } else if (lookupType == 1 || lookupType == 2) {
       bitArray.skipBits(32); // minimumValue
       bitArray.skipBits(32); // deltaValue
@@ -528,11 +592,11 @@ public final class VorbisUtil {
       // discard (no decoding required yet)
       bitArray.skipBits((int) (lookupValuesCount * valueBits));
     }
-    return new CodeBook(dimensions, entries, lengthMap, lookupType, isOrdered);
   }
 
   /**
-   * @see <a href="http://svn.xiph.org/trunk/vorbis/lib/sharedbook.c">_book_maptype1_quantvals</a>
+   * See the <a
+   * href="http://svn.xiph.org/trunk/vorbis/lib/sharedbook.c">_book_maptype1_quantvals</a>
    */
   private static long mapType1QuantValues(long entries, long dimension) {
     return (long) Math.floor(Math.pow(entries, 1.d / dimension));
@@ -540,24 +604,5 @@ public final class VorbisUtil {
 
   private VorbisUtil() {
     // Prevent instantiation.
-  }
-
-  private static final class CodeBook {
-
-    public final int dimensions;
-    public final int entries;
-    public final long[] lengthMap;
-    public final int lookupType;
-    public final boolean isOrdered;
-
-    public CodeBook(int dimensions, int entries, long[] lengthMap, int lookupType,
-        boolean isOrdered) {
-      this.dimensions = dimensions;
-      this.entries = entries;
-      this.lengthMap = lengthMap;
-      this.lookupType = lookupType;
-      this.isOrdered = isOrdered;
-    }
-
   }
 }

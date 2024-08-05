@@ -21,20 +21,36 @@ import com.google.android.exoplayer2.extractor.ConstantBitrateSeekMap;
 
 /**
  * MP3 seeker that doesn't rely on metadata and seeks assuming the source has a constant bitrate.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class ConstantBitrateSeeker extends ConstantBitrateSeekMap implements Seeker {
 
   /**
    * @param inputLength The length of the stream in bytes, or {@link C#LENGTH_UNSET} if unknown.
    * @param firstFramePosition The position of the first frame in the stream.
    * @param mpegAudioHeader The MPEG audio header associated with the first frame.
+   * @param allowSeeksIfLengthUnknown Whether to allow seeking even if the length of the content is
+   *     unknown.
    */
   public ConstantBitrateSeeker(
-      long inputLength, long firstFramePosition, MpegAudioUtil.Header mpegAudioHeader) {
+      long inputLength,
+      long firstFramePosition,
+      MpegAudioUtil.Header mpegAudioHeader,
+      boolean allowSeeksIfLengthUnknown) {
     // Set the seeker frame size to the size of the first frame (even though some constant bitrate
     // streams have variable frame sizes) to avoid the need to re-synchronize for constant frame
     // size streams.
-    super(inputLength, firstFramePosition, mpegAudioHeader.bitrate, mpegAudioHeader.frameSize);
+    super(
+        inputLength,
+        firstFramePosition,
+        mpegAudioHeader.bitrate,
+        mpegAudioHeader.frameSize,
+        allowSeeksIfLengthUnknown);
   }
 
   @Override
@@ -44,6 +60,6 @@ import com.google.android.exoplayer2.extractor.ConstantBitrateSeekMap;
 
   @Override
   public long getDataEndPosition() {
-    return C.POSITION_UNSET;
+    return C.INDEX_UNSET;
   }
 }

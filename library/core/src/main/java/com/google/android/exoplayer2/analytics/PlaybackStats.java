@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.analytics;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.os.SystemClock;
 import androidx.annotation.IntDef;
@@ -25,14 +26,21 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.analytics.AnalyticsListener.EventTime;
 import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Collections;
 import java.util.List;
 
-/** Statistics about playbacks. */
+/**
+ * Statistics about playbacks.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class PlaybackStats {
 
   /** Stores a playback state with the event time at which it became active. */
@@ -172,7 +180,7 @@ public final class PlaybackStats {
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
-  @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+  @Target(TYPE_USE)
   @IntDef({
     PLAYBACK_STATE_NOT_STARTED,
     PLAYBACK_STATE_JOINING_BACKGROUND,
@@ -336,7 +344,7 @@ public final class PlaybackStats {
     return new PlaybackStats(
         playbackCount,
         playbackStateDurationsMs,
-        /* playbackStateHistory */ Collections.emptyList(),
+        /* playbackStateHistory= */ Collections.emptyList(),
         /* mediaTimeHistory= */ Collections.emptyList(),
         firstReportedTimeMs,
         foregroundPlaybackCount,

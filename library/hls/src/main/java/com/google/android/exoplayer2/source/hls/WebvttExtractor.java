@@ -45,7 +45,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
  * sample timestamp for each by sniffing the X-TIMESTAMP-MAP header along with the start timestamp
  * of the first cue header. Empty WebVTT files are not passed through, since it's not possible to
  * derive a sample timestamp in this case.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class WebvttExtractor implements Extractor {
 
   private static final Pattern LOCAL_TIMESTAMP = Pattern.compile("LOCAL:([^,]+)");
@@ -115,8 +121,10 @@ public final class WebvttExtractor implements Extractor {
 
     // Increase the size of sampleData if necessary.
     if (sampleSize == sampleData.length) {
-      sampleData = Arrays.copyOf(sampleData,
-          (currentFileSize != C.LENGTH_UNSET ? currentFileSize : sampleData.length) * 3 / 2);
+      sampleData =
+          Arrays.copyOf(
+              sampleData,
+              (currentFileSize != C.LENGTH_UNSET ? currentFileSize : sampleData.length) * 3 / 2);
     }
 
     // Consume to the input.
@@ -151,11 +159,13 @@ public final class WebvttExtractor implements Extractor {
       if (line.startsWith("X-TIMESTAMP-MAP")) {
         Matcher localTimestampMatcher = LOCAL_TIMESTAMP.matcher(line);
         if (!localTimestampMatcher.find()) {
-          throw new ParserException("X-TIMESTAMP-MAP doesn't contain local timestamp: " + line);
+          throw ParserException.createForMalformedContainer(
+              "X-TIMESTAMP-MAP doesn't contain local timestamp: " + line, /* cause= */ null);
         }
         Matcher mediaTimestampMatcher = MEDIA_TIMESTAMP.matcher(line);
         if (!mediaTimestampMatcher.find()) {
-          throw new ParserException("X-TIMESTAMP-MAP doesn't contain media timestamp: " + line);
+          throw ParserException.createForMalformedContainer(
+              "X-TIMESTAMP-MAP doesn't contain media timestamp: " + line, /* cause= */ null);
         }
         vttTimestampUs =
             WebvttParserUtil.parseTimestampUs(
@@ -200,5 +210,4 @@ public final class WebvttExtractor implements Extractor {
     output.endTracks();
     return trackOutput;
   }
-
 }

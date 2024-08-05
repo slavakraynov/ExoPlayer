@@ -15,28 +15,32 @@
  */
 package com.google.android.exoplayer2.source.hls;
 
-import com.google.android.exoplayer2.source.hls.playlist.HlsMasterPlaylist;
 import com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist;
+import com.google.android.exoplayer2.source.hls.playlist.HlsMultivariantPlaylist;
 
-/** Holds a master playlist along with a snapshot of one of its media playlists. */
+/**
+ * Holds a multivariant playlist along with a snapshot of one of its media playlists.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class HlsManifest {
 
-  /**
-   * The master playlist of an HLS stream.
-   */
-  public final HlsMasterPlaylist masterPlaylist;
-  /**
-   * A snapshot of a media playlist referred to by {@link #masterPlaylist}.
-   */
+  /** The multivariant playlist of an HLS stream. */
+  public final HlsMultivariantPlaylist multivariantPlaylist;
+  /** A snapshot of a media playlist referred to by {@link #multivariantPlaylist}. */
   public final HlsMediaPlaylist mediaPlaylist;
 
   /**
-   * @param masterPlaylist The master playlist.
+   * @param multivariantPlaylist The multivariant playlist.
    * @param mediaPlaylist The media playlist.
    */
-  HlsManifest(HlsMasterPlaylist masterPlaylist, HlsMediaPlaylist mediaPlaylist) {
-    this.masterPlaylist = masterPlaylist;
+  /* package */ HlsManifest(
+      HlsMultivariantPlaylist multivariantPlaylist, HlsMediaPlaylist mediaPlaylist) {
+    this.multivariantPlaylist = multivariantPlaylist;
     this.mediaPlaylist = mediaPlaylist;
   }
-
 }

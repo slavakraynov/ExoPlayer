@@ -28,20 +28,24 @@ import java.util.Arrays;
 
 /**
  * OGG packet class.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class OggPacket {
 
   private final OggPageHeader pageHeader = new OggPageHeader();
-  private final ParsableByteArray packetArray = new ParsableByteArray(
-      new byte[OggPageHeader.MAX_PAGE_PAYLOAD], 0);
+  private final ParsableByteArray packetArray =
+      new ParsableByteArray(new byte[OggPageHeader.MAX_PAGE_PAYLOAD], 0);
 
   private int currentSegmentIndex = C.INDEX_UNSET;
   private int segmentCount;
   private boolean populated;
 
-  /**
-   * Resets this reader.
-   */
+  /** Resets this reader. */
   public void reset() {
     pageHeader.reset();
     packetArray.reset(/* limit= */ 0);
@@ -99,8 +103,8 @@ import java.util.Arrays;
         populated = pageHeader.laces[segmentIndex - 1] != 255;
       }
       // Advance now since we are sure reading didn't throw an exception.
-      currentSegmentIndex = segmentIndex == pageHeader.pageSegmentCount ? C.INDEX_UNSET
-          : segmentIndex;
+      currentSegmentIndex =
+          segmentIndex == pageHeader.pageSegmentCount ? C.INDEX_UNSET : segmentIndex;
     }
     return true;
   }
@@ -119,16 +123,12 @@ import java.util.Arrays;
     return pageHeader;
   }
 
-  /**
-   * Returns a {@link ParsableByteArray} containing the packet's payload.
-   */
+  /** Returns a {@link ParsableByteArray} containing the packet's payload. */
   public ParsableByteArray getPayload() {
     return packetArray;
   }
 
-  /**
-   * Trims the packet data array.
-   */
+  /** Trims the packet data array. */
   public void trimPayload() {
     if (packetArray.getData().length == OggPageHeader.MAX_PAGE_PAYLOAD) {
       return;
@@ -158,5 +158,4 @@ import java.util.Arrays;
     }
     return size;
   }
-
 }

@@ -19,18 +19,27 @@ import static com.google.android.exoplayer2.demo.DemoUtil.DOWNLOAD_NOTIFICATION_
 
 import android.app.Notification;
 import android.content.Context;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.offline.Download;
 import com.google.android.exoplayer2.offline.DownloadManager;
 import com.google.android.exoplayer2.offline.DownloadService;
 import com.google.android.exoplayer2.scheduler.PlatformScheduler;
+import com.google.android.exoplayer2.scheduler.Requirements;
+import com.google.android.exoplayer2.scheduler.Scheduler;
 import com.google.android.exoplayer2.ui.DownloadNotificationHelper;
 import com.google.android.exoplayer2.util.NotificationUtil;
 import com.google.android.exoplayer2.util.Util;
 import java.util.List;
 
-/** A service for downloading media. */
+/**
+ * A service for downloading media.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class DemoDownloadService extends DownloadService {
 
   private static final int JOB_ID = 1;
@@ -46,7 +55,6 @@ public class DemoDownloadService extends DownloadService {
   }
 
   @Override
-  @NonNull
   protected DownloadManager getDownloadManager() {
     // This will only happen once, because getDownloadManager is guaranteed to be called only once
     // in the life cycle of the process.
@@ -60,20 +68,21 @@ public class DemoDownloadService extends DownloadService {
   }
 
   @Override
-  protected PlatformScheduler getScheduler() {
+  protected Scheduler getScheduler() {
     return Util.SDK_INT >= 21 ? new PlatformScheduler(this, JOB_ID) : null;
   }
 
   @Override
-  @NonNull
-  protected Notification getForegroundNotification(@NonNull List<Download> downloads) {
+  protected Notification getForegroundNotification(
+      List<Download> downloads, @Requirements.RequirementFlags int notMetRequirements) {
     return DemoUtil.getDownloadNotificationHelper(/* context= */ this)
         .buildProgressNotification(
             /* context= */ this,
             R.drawable.ic_download,
             /* contentIntent= */ null,
             /* message= */ null,
-            downloads);
+            downloads,
+            notMetRequirements);
   }
 
   /**

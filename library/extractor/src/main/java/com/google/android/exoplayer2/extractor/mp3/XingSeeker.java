@@ -24,7 +24,15 @@ import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
 
-/** MP3 seeker that uses metadata from a Xing header. */
+/**
+ * MP3 seeker that uses metadata from a Xing header.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class XingSeeker implements Seeker {
 
   private static final String TAG = "XingSeeker";
@@ -57,8 +65,8 @@ import com.google.android.exoplayer2.util.Util;
       // If the frame count is missing/invalid, the header can't be used to determine the duration.
       return null;
     }
-    long durationUs = Util.scaleLargeTimestamp(frameCount, samplesPerFrame * C.MICROS_PER_SECOND,
-        sampleRate);
+    long durationUs =
+        Util.scaleLargeTimestamp(frameCount, samplesPerFrame * C.MICROS_PER_SECOND, sampleRate);
     if ((flags & 0x06) != 0x06) {
       // If the size in bytes or table of contents is missing, the stream is not seekable.
       return new XingSeeker(position, mpegAudioHeader.frameSize, durationUs);
@@ -114,7 +122,7 @@ import com.google.android.exoplayer2.util.Util;
     this.durationUs = durationUs;
     this.tableOfContents = tableOfContents;
     this.dataSize = dataSize;
-    dataEndPosition = dataSize == C.LENGTH_UNSET ? C.POSITION_UNSET : dataStartPosition + dataSize;
+    dataEndPosition = dataSize == C.LENGTH_UNSET ? C.INDEX_UNSET : dataStartPosition + dataSize;
   }
 
   @Override
@@ -141,8 +149,8 @@ import com.google.android.exoplayer2.util.Util;
       double nextScaledPosition = prevTableIndex == 99 ? 256 : tableOfContents[prevTableIndex + 1];
       // Linearly interpolate between the two scaled positions.
       double interpolateFraction = percent - prevTableIndex;
-      scaledPosition = prevScaledPosition
-          + (interpolateFraction * (nextScaledPosition - prevScaledPosition));
+      scaledPosition =
+          prevScaledPosition + (interpolateFraction * (nextScaledPosition - prevScaledPosition));
     }
     long positionOffset = Math.round((scaledPosition / 256) * dataSize);
     // Ensure returned positions skip the frame containing the XING header.
@@ -164,8 +172,10 @@ import com.google.android.exoplayer2.util.Util;
     long nextTimeUs = getTimeUsForTableIndex(prevTableIndex + 1);
     long nextScaledPosition = prevTableIndex == 99 ? 256 : tableOfContents[prevTableIndex + 1];
     // Linearly interpolate between the two table entries.
-    double interpolateFraction = prevScaledPosition == nextScaledPosition ? 0
-        : ((scaledPosition - prevScaledPosition) / (nextScaledPosition - prevScaledPosition));
+    double interpolateFraction =
+        prevScaledPosition == nextScaledPosition
+            ? 0
+            : ((scaledPosition - prevScaledPosition) / (nextScaledPosition - prevScaledPosition));
     return prevTimeUs + Math.round(interpolateFraction * (nextTimeUs - prevTimeUs));
   }
 
@@ -188,5 +198,4 @@ import com.google.android.exoplayer2.util.Util;
   private long getTimeUsForTableIndex(int tableIndex) {
     return (durationUs * tableIndex) / 100;
   }
-
 }

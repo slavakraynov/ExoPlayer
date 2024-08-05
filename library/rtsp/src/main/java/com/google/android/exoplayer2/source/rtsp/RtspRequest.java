@@ -16,13 +16,24 @@
 
 package com.google.android.exoplayer2.source.rtsp;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import android.net.Uri;
 import androidx.annotation.IntDef;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/** Represents an RTSP request. */
+/**
+ * Represents an RTSP request.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class RtspRequest {
   /**
    * RTSP request methods, as defined in RFC2326 Section 10.
@@ -47,6 +58,7 @@ import java.lang.annotation.RetentionPolicy;
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef(
       value = {
         METHOD_UNSET,
@@ -82,7 +94,7 @@ import java.lang.annotation.RetentionPolicy;
   /** The {@link Uri} to which this request is sent. */
   public final Uri uri;
   /** The request method, as defined in {@link Method}. */
-  @Method public final int method;
+  public final @Method int method;
   /** The headers of this request. */
   public final RtspHeaders headers;
   /** The body of this RTSP message, or empty string if absent. */

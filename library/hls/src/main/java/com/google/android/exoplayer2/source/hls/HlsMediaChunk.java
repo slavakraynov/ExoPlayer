@@ -21,6 +21,7 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.extractor.DefaultExtractorInput;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
@@ -29,20 +30,24 @@ import com.google.android.exoplayer2.metadata.id3.Id3Decoder;
 import com.google.android.exoplayer2.metadata.id3.PrivFrame;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist;
+import com.google.android.exoplayer2.upstream.CmcdConfiguration;
+import com.google.android.exoplayer2.upstream.CmcdHeadersFactory;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.UriUtil;
-import com.google.android.exoplayer2.util.Util;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -50,7 +55,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
 /**
  * An HLS {@link MediaChunk}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class HlsMediaChunk extends MediaChunk {
 
   /**
@@ -65,17 +76,21 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * @param segmentBaseHolder The segment holder.
    * @param playlistUrl The url of the playlist from which this chunk was obtained.
    * @param muxedCaptionFormats List of muxed caption {@link Format}s. Null if no closed caption
-   *     information is available in the master playlist.
+   *     information is available in the multivariant playlist.
    * @param trackSelectionReason See {@link #trackSelectionReason}.
    * @param trackSelectionData See {@link #trackSelectionData}.
-   * @param isMasterTimestampSource True if the chunk can initialize the timestamp adjuster.
+   * @param isPrimaryTimestampSource True if the chunk can initialize the timestamp adjuster.
    * @param timestampAdjusterProvider The provider from which to obtain the {@link
    *     TimestampAdjuster}.
+   * @param timestampAdjusterInitializationTimeoutMs The timeout for the loading thread to wait for
+   *     the timestamp adjuster to initialize, in milliseconds. A timeout of zero is interpreted as
+   *     an infinite timeout.
    * @param previousChunk The {@link HlsMediaChunk} that preceded this one. May be null.
    * @param mediaSegmentKey The media segment decryption key, if fully encrypted. Null otherwise.
    * @param initSegmentKey The initialization segment decryption key, if fully encrypted. Null
    *     otherwise.
    * @param shouldSpliceIn Whether samples for this chunk should be spliced into existing samples.
+   * @param cmcdHeadersFactory The {@link CmcdHeadersFactory} for generating CMCD request headers.
    */
   public static HlsMediaChunk createInstance(
       HlsExtractorFactory extractorFactory,
@@ -86,22 +101,32 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       HlsChunkSource.SegmentBaseHolder segmentBaseHolder,
       Uri playlistUrl,
       @Nullable List<Format> muxedCaptionFormats,
-      int trackSelectionReason,
+      @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
-      boolean isMasterTimestampSource,
+      boolean isPrimaryTimestampSource,
       TimestampAdjusterProvider timestampAdjusterProvider,
+      long timestampAdjusterInitializationTimeoutMs,
       @Nullable HlsMediaChunk previousChunk,
       @Nullable byte[] mediaSegmentKey,
       @Nullable byte[] initSegmentKey,
-      boolean shouldSpliceIn) {
+      boolean shouldSpliceIn,
+      PlayerId playerId,
+      @Nullable CmcdHeadersFactory cmcdHeadersFactory) {
     // Media segment.
     HlsMediaPlaylist.SegmentBase mediaSegment = segmentBaseHolder.segmentBase;
+    ImmutableMap<@CmcdConfiguration.HeaderKey String, String> httpRequestHeaders =
+        cmcdHeadersFactory == null
+            ? ImmutableMap.of()
+            : cmcdHeadersFactory
+                .setChunkDurationUs(mediaSegment.durationUs)
+                .createHttpRequestHeaders();
     DataSpec dataSpec =
         new DataSpec.Builder()
             .setUri(UriUtil.resolveToUri(mediaPlaylist.baseUri, mediaSegment.url))
             .setPosition(mediaSegment.byteRangeOffset)
             .setLength(mediaSegment.byteRangeLength)
             .setFlags(segmentBaseHolder.isPreload ? FLAG_MIGHT_NOT_USE_FULL_NETWORK_SPEED : 0)
+            .setHttpRequestHeaders(httpRequestHeaders)
             .build();
     boolean mediaSegmentEncrypted = mediaSegmentKey != null;
     @Nullable
@@ -124,8 +149,19 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               ? getEncryptionIvArray(Assertions.checkNotNull(initSegment.encryptionIV))
               : null;
       Uri initSegmentUri = UriUtil.resolveToUri(mediaPlaylist.baseUri, initSegment.url);
+      ImmutableMap<@CmcdConfiguration.HeaderKey String, String> initHttpRequestHeaders =
+          cmcdHeadersFactory == null
+              ? ImmutableMap.of()
+              : cmcdHeadersFactory
+                  .setObjectType(CmcdHeadersFactory.OBJECT_TYPE_INIT_SEGMENT)
+                  .createHttpRequestHeaders();
       initDataSpec =
-          new DataSpec(initSegmentUri, initSegment.byteRangeOffset, initSegment.byteRangeLength);
+          new DataSpec.Builder()
+              .setUri(initSegmentUri)
+              .setPosition(initSegment.byteRangeOffset)
+              .setLength(initSegment.byteRangeLength)
+              .setHttpRequestHeaders(initHttpRequestHeaders)
+              .build();
       initDataSource = buildDataSource(dataSource, initSegmentKey, initSegmentIv);
     }
 
@@ -180,13 +216,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         /* isPublished= */ !segmentBaseHolder.isPreload,
         discontinuitySequenceNumber,
         mediaSegment.hasGapTag,
-        isMasterTimestampSource,
+        isPrimaryTimestampSource,
         /* timestampAdjuster= */ timestampAdjusterProvider.getAdjuster(discontinuitySequenceNumber),
+        timestampAdjusterInitializationTimeoutMs,
         mediaSegment.drmInitData,
         previousExtractor,
         id3Decoder,
         scratchId3Data,
-        shouldSpliceIn);
+        shouldSpliceIn,
+        playerId);
   }
 
   /**
@@ -229,14 +267,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   private static final AtomicInteger uidSource = new AtomicInteger();
 
-  /**
-   * A unique identifier for the chunk.
-   */
+  /** A unique identifier for the chunk. */
   public final int uid;
 
-  /**
-   * The discontinuity sequence number of the chunk.
-   */
+  /** The discontinuity sequence number of the chunk. */
   public final int discontinuitySequenceNumber;
 
   /** The url of the playlist from which this chunk was obtained. */
@@ -252,7 +286,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Nullable private final DataSpec initDataSpec;
   @Nullable private final HlsMediaChunkExtractor previousExtractor;
 
-  private final boolean isMasterTimestampSource;
+  private final boolean isPrimaryTimestampSource;
   private final boolean hasGapTag;
   private final TimestampAdjuster timestampAdjuster;
   private final HlsExtractorFactory extractorFactory;
@@ -262,6 +296,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final ParsableByteArray scratchId3Data;
   private final boolean mediaSegmentEncrypted;
   private final boolean initSegmentEncrypted;
+  private final PlayerId playerId;
+  private final long timestampAdjusterInitializationTimeoutMs;
 
   private @MonotonicNonNull HlsMediaChunkExtractor extractor;
   private @MonotonicNonNull HlsSampleStreamWrapper output;
@@ -286,7 +322,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       boolean initSegmentEncrypted,
       Uri playlistUrl,
       @Nullable List<Format> muxedCaptionFormats,
-      int trackSelectionReason,
+      @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
       long startTimeUs,
       long endTimeUs,
@@ -295,13 +331,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       boolean isPublished,
       int discontinuitySequenceNumber,
       boolean hasGapTag,
-      boolean isMasterTimestampSource,
+      boolean isPrimaryTimestampSource,
       TimestampAdjuster timestampAdjuster,
+      long timestampAdjusterInitializationTimeoutMs,
       @Nullable DrmInitData drmInitData,
       @Nullable HlsMediaChunkExtractor previousExtractor,
       Id3Decoder id3Decoder,
       ParsableByteArray scratchId3Data,
-      boolean shouldSpliceIn) {
+      boolean shouldSpliceIn,
+      PlayerId playerId) {
     super(
         mediaDataSource,
         dataSpec,
@@ -320,8 +358,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.initDataLoadRequired = initDataSpec != null;
     this.initSegmentEncrypted = initSegmentEncrypted;
     this.playlistUrl = playlistUrl;
-    this.isMasterTimestampSource = isMasterTimestampSource;
+    this.isPrimaryTimestampSource = isPrimaryTimestampSource;
     this.timestampAdjuster = timestampAdjuster;
+    this.timestampAdjusterInitializationTimeoutMs = timestampAdjusterInitializationTimeoutMs;
     this.hasGapTag = hasGapTag;
     this.extractorFactory = extractorFactory;
     this.muxedCaptionFormats = muxedCaptionFormats;
@@ -330,6 +369,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.id3Decoder = id3Decoder;
     this.scratchId3Data = scratchId3Data;
     this.shouldSpliceIn = shouldSpliceIn;
+    this.playerId = playerId;
     sampleQueueFirstSampleIndices = ImmutableList.of();
     uid = uidSource.getAndIncrement();
   }
@@ -423,19 +463,19 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     // initDataLoadRequired =>  initDataSource != null && initDataSpec != null
     Assertions.checkNotNull(initDataSource);
     Assertions.checkNotNull(initDataSpec);
-    feedDataToExtractor(initDataSource, initDataSpec, initSegmentEncrypted);
+    feedDataToExtractor(
+        initDataSource,
+        initDataSpec,
+        initSegmentEncrypted,
+        /* initializeTimestampAdjuster= */ false);
     nextLoadPosition = 0;
     initDataLoadRequired = false;
   }
 
   @RequiresNonNull("output")
   private void loadMedia() throws IOException {
-    try {
-      timestampAdjuster.sharedInitializeOrWait(isMasterTimestampSource, startTimeUs);
-    } catch (InterruptedException e) {
-      throw new InterruptedIOException();
-    }
-    feedDataToExtractor(dataSource, dataSpec, mediaSegmentEncrypted);
+    feedDataToExtractor(
+        dataSource, dataSpec, mediaSegmentEncrypted, /* initializeTimestampAdjuster= */ true);
   }
 
   /**
@@ -445,7 +485,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    */
   @RequiresNonNull("output")
   private void feedDataToExtractor(
-      DataSource dataSource, DataSpec dataSpec, boolean dataIsEncrypted) throws IOException {
+      DataSource dataSource,
+      DataSpec dataSpec,
+      boolean dataIsEncrypted,
+      boolean initializeTimestampAdjuster)
+      throws IOException {
     // If we previously fed part of this chunk to the extractor, we need to skip it this time. For
     // encrypted content we need to skip the data by reading it through the source, so as to ensure
     // correct decryption of the remainder of the chunk. For clear content, we can request the
@@ -460,7 +504,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       skipLoadedBytes = false;
     }
     try {
-      ExtractorInput input = prepareExtraction(dataSource, loadDataSpec);
+      ExtractorInput input =
+          prepareExtraction(dataSource, loadDataSpec, initializeTimestampAdjuster);
       if (skipLoadedBytes) {
         input.skipFully(nextLoadPosition);
       }
@@ -478,15 +523,26 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         nextLoadPosition = (int) (input.getPosition() - dataSpec.position);
       }
     } finally {
-      Util.closeQuietly(dataSource);
+      DataSourceUtil.closeQuietly(dataSource);
     }
   }
 
   @RequiresNonNull("output")
   @EnsuresNonNull("extractor")
-  private DefaultExtractorInput prepareExtraction(DataSource dataSource, DataSpec dataSpec)
+  private DefaultExtractorInput prepareExtraction(
+      DataSource dataSource, DataSpec dataSpec, boolean initializeTimestampAdjuster)
       throws IOException {
     long bytesToRead = dataSource.open(dataSpec);
+    if (initializeTimestampAdjuster) {
+      try {
+        timestampAdjuster.sharedInitializeOrWait(
+            isPrimaryTimestampSource, startTimeUs, timestampAdjusterInitializationTimeoutMs);
+      } catch (InterruptedException e) {
+        throw new InterruptedIOException();
+      } catch (TimeoutException e) {
+        throw new IOException(e);
+      }
+    }
     DefaultExtractorInput extractorInput =
         new DefaultExtractorInput(dataSource, dataSpec.position, bytesToRead);
 
@@ -503,7 +559,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
                   muxedCaptionFormats,
                   timestampAdjuster,
                   dataSource.getResponseHeaders(),
-                  extractorInput);
+                  extractorInput,
+                  playerId);
       if (extractor.isPackedAudioExtractor()) {
         output.setSampleOffsetUs(
             id3Timestamp != C.TIME_UNSET

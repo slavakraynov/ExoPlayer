@@ -15,14 +15,17 @@
  */
 package com.google.android.exoplayer2.util;
 
+import static com.google.android.exoplayer2.util.Assertions.checkState;
+
 import android.os.Looper;
 import android.os.Message;
 import androidx.annotation.CheckResult;
+import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import java.util.ArrayDeque;
 import java.util.concurrent.CopyOnWriteArraySet;
-import javax.annotation.Nonnull;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 /**
  * A set of listeners.
@@ -33,9 +36,17 @@ import javax.annotation.Nonnull;
  * <p>Events are also guaranteed to be only sent to the listeners registered at the time the event
  * was enqueued and haven't been removed since.
  *
+ * <p>All methods must be called on the {@link Looper} passed to the constructor unless indicated
+ * otherwise.
+ *
  * @param <T> The listener type.
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
-public final class ListenerSet<T> {
+@Deprecated
+public final class ListenerSet<T extends @NonNull Object> {
 
   /**
    * An event sent to a listener.
@@ -60,14 +71,13 @@ public final class ListenerSet<T> {
      * Invokes the iteration finished event.
      *
      * @param listener The listener to invoke the event on.
-     * @param eventFlags The combined event {@link ExoFlags flags} of all events sent in this
+     * @param eventFlags The combined event {@link FlagSet flags} of all events sent in this
      *     iteration.
      */
-    void invoke(T listener, ExoFlags eventFlags);
+    void invoke(T listener, FlagSet eventFlags);
   }
 
   private static final int MSG_ITERATION_FINISHED = 0;
-  private static final int MSG_LAZY_RELEASE = 1;
 
   private final Clock clock;
   private final HandlerWrapper handler;
@@ -75,14 +85,18 @@ public final class ListenerSet<T> {
   private final CopyOnWriteArraySet<ListenerHolder<T>> listeners;
   private final ArrayDeque<Runnable> flushingEvents;
   private final ArrayDeque<Runnable> queuedEvents;
+  private final Object releasedLock;
 
+  @GuardedBy("releasedLock")
   private boolean released;
+
+  private boolean throwsWhenUsingWrongThread;
 
   /**
    * Creates a new listener set.
    *
    * @param looper A {@link Looper} used to call listeners on. The same {@link Looper} must be used
-   *     to call all other methods of this class.
+   *     to call all other methods of this class unless indicated otherwise.
    * @param clock A {@link Clock}.
    * @param iterationFinishedEvent An {@link IterationFinishedEvent} sent when all other events sent
    *     during one {@link Looper} message queue iteration were handled by the listeners.
@@ -92,27 +106,33 @@ public final class ListenerSet<T> {
         /* listeners= */ new CopyOnWriteArraySet<>(),
         looper,
         clock,
-        iterationFinishedEvent);
+        iterationFinishedEvent,
+        /* throwsWhenUsingWrongThread= */ true);
   }
 
   private ListenerSet(
       CopyOnWriteArraySet<ListenerHolder<T>> listeners,
       Looper looper,
       Clock clock,
-      IterationFinishedEvent<T> iterationFinishedEvent) {
+      IterationFinishedEvent<T> iterationFinishedEvent,
+      boolean throwsWhenUsingWrongThread) {
     this.clock = clock;
     this.listeners = listeners;
     this.iterationFinishedEvent = iterationFinishedEvent;
+    releasedLock = new Object();
     flushingEvents = new ArrayDeque<>();
     queuedEvents = new ArrayDeque<>();
     // It's safe to use "this" because we don't send a message before exiting the constructor.
-    @SuppressWarnings("methodref.receiver.bound.invalid")
+    @SuppressWarnings("nullness:methodref.receiver.bound")
     HandlerWrapper handler = clock.createHandler(looper, this::handleMessage);
     this.handler = handler;
+    this.throwsWhenUsingWrongThread = throwsWhenUsingWrongThread;
   }
 
   /**
    * Copies the listener set.
+   *
+   * <p>This method can be called from any thread.
    *
    * @param looper The new {@link Looper} for the copied listener set.
    * @param iterationFinishedEvent The new {@link IterationFinishedEvent} sent when all other events
@@ -121,7 +141,25 @@ public final class ListenerSet<T> {
    */
   @CheckResult
   public ListenerSet<T> copy(Looper looper, IterationFinishedEvent<T> iterationFinishedEvent) {
-    return new ListenerSet<>(listeners, looper, clock, iterationFinishedEvent);
+    return copy(looper, clock, iterationFinishedEvent);
+  }
+
+  /**
+   * Copies the listener set.
+   *
+   * <p>This method can be called from any thread.
+   *
+   * @param looper The new {@link Looper} for the copied listener set.
+   * @param clock The new {@link Clock} for the copied listener set.
+   * @param iterationFinishedEvent The new {@link IterationFinishedEvent} sent when all other events
+   *     sent during one {@link Looper} message queue iteration were handled by the listeners.
+   * @return The copied listener set.
+   */
+  @CheckResult
+  public ListenerSet<T> copy(
+      Looper looper, Clock clock, IterationFinishedEvent<T> iterationFinishedEvent) {
+    return new ListenerSet<>(
+        listeners, looper, clock, iterationFinishedEvent, throwsWhenUsingWrongThread);
   }
 
   /**
@@ -129,14 +167,18 @@ public final class ListenerSet<T> {
    *
    * <p>If a listener is already present, it will not be added again.
    *
+   * <p>This method can be called from any thread.
+   *
    * @param listener The listener to be added.
    */
   public void add(T listener) {
-    if (released) {
-      return;
-    }
     Assertions.checkNotNull(listener);
-    listeners.add(new ListenerHolder<>(listener));
+    synchronized (releasedLock) {
+      if (released) {
+        return;
+      }
+      listeners.add(new ListenerHolder<>(listener));
+    }
   }
 
   /**
@@ -147,12 +189,25 @@ public final class ListenerSet<T> {
    * @param listener The listener to be removed.
    */
   public void remove(T listener) {
+    verifyCurrentThread();
     for (ListenerHolder<T> listenerHolder : listeners) {
       if (listenerHolder.listener.equals(listener)) {
         listenerHolder.release(iterationFinishedEvent);
         listeners.remove(listenerHolder);
       }
     }
+  }
+
+  /** Removes all listeners from the set. */
+  public void clear() {
+    verifyCurrentThread();
+    listeners.clear();
+  }
+
+  /** Returns the number of added listeners. */
+  public int size() {
+    verifyCurrentThread();
+    return listeners.size();
   }
 
   /**
@@ -163,6 +218,7 @@ public final class ListenerSet<T> {
    * @param event The event.
    */
   public void queueEvent(int eventFlag, Event<T> event) {
+    verifyCurrentThread();
     CopyOnWriteArraySet<ListenerHolder<T>> listenerSnapshot = new CopyOnWriteArraySet<>(listeners);
     queuedEvents.add(
         () -> {
@@ -174,11 +230,12 @@ public final class ListenerSet<T> {
 
   /** Notifies listeners of events previously enqueued with {@link #queueEvent(int, Event)}. */
   public void flushEvents() {
+    verifyCurrentThread();
     if (queuedEvents.isEmpty()) {
       return;
     }
     if (!handler.hasMessages(MSG_ITERATION_FINISHED)) {
-      handler.obtainMessage(MSG_ITERATION_FINISHED).sendToTarget();
+      handler.sendMessageAtFrontOfQueue(handler.obtainMessage(MSG_ITERATION_FINISHED));
     }
     boolean recursiveFlushInProgress = !flushingEvents.isEmpty();
     flushingEvents.addAll(queuedEvents);
@@ -212,64 +269,66 @@ public final class ListenerSet<T> {
    * <p>This will ensure no events are sent to any listener after this method has been called.
    */
   public void release() {
+    verifyCurrentThread();
+    synchronized (releasedLock) {
+      released = true;
+    }
     for (ListenerHolder<T> listenerHolder : listeners) {
       listenerHolder.release(iterationFinishedEvent);
     }
     listeners.clear();
-    released = true;
   }
 
   /**
-   * Releases the set of listeners after all already scheduled {@link Looper} messages were able to
-   * trigger final events.
+   * Sets whether methods throw when using the wrong thread.
    *
-   * <p>After the specified released callback event, no other events are sent to a listener.
+   * <p>Do not use this method unless to support legacy use cases.
    *
-   * @param releaseEventFlag An integer flag indicating the type of the release event, or {@link
-   *     C#INDEX_UNSET} to report this event without a flag.
-   * @param releaseEvent The release event.
+   * @param throwsWhenUsingWrongThread Whether to throw when using the wrong thread.
+   * @deprecated Do not use this method and ensure all calls are made from the correct thread.
    */
-  public void lazyRelease(int releaseEventFlag, Event<T> releaseEvent) {
-    handler.obtainMessage(MSG_LAZY_RELEASE, releaseEventFlag, 0, releaseEvent).sendToTarget();
+  @Deprecated
+  public void setThrowsWhenUsingWrongThread(boolean throwsWhenUsingWrongThread) {
+    this.throwsWhenUsingWrongThread = throwsWhenUsingWrongThread;
   }
 
   private boolean handleMessage(Message message) {
-    if (message.what == MSG_ITERATION_FINISHED) {
-      for (ListenerHolder<T> holder : listeners) {
-        holder.iterationFinished(iterationFinishedEvent);
-        if (handler.hasMessages(MSG_ITERATION_FINISHED)) {
-          // The invocation above triggered new events (and thus scheduled a new message). We need
-          // to stop here because this new message will take care of informing every listener about
-          // the new update (including the ones already called here).
-          break;
-        }
+    for (ListenerHolder<T> holder : listeners) {
+      holder.iterationFinished(iterationFinishedEvent);
+      if (handler.hasMessages(MSG_ITERATION_FINISHED)) {
+        // The invocation above triggered new events (and thus scheduled a new message). We need
+        // to stop here because this new message will take care of informing every listener about
+        // the new update (including the ones already called here).
+        break;
       }
-    } else if (message.what == MSG_LAZY_RELEASE) {
-      int releaseEventFlag = message.arg1;
-      @SuppressWarnings("unchecked")
-      Event<T> releaseEvent = (Event<T>) message.obj;
-      sendEvent(releaseEventFlag, releaseEvent);
-      release();
     }
     return true;
   }
 
-  private static final class ListenerHolder<T> {
+  private void verifyCurrentThread() {
+    if (!throwsWhenUsingWrongThread) {
+      return;
+    }
+    checkState(Thread.currentThread() == handler.getLooper().getThread());
+  }
 
-    @Nonnull public final T listener;
+  private static final class ListenerHolder<T extends @NonNull Object> {
 
-    private ExoFlags.Builder flagsBuilder;
+    public final T listener;
+
+    private FlagSet.Builder flagsBuilder;
     private boolean needsIterationFinishedEvent;
     private boolean released;
 
-    public ListenerHolder(@Nonnull T listener) {
+    public ListenerHolder(T listener) {
       this.listener = listener;
-      this.flagsBuilder = new ExoFlags.Builder();
+      this.flagsBuilder = new FlagSet.Builder();
     }
 
     public void release(IterationFinishedEvent<T> event) {
       released = true;
       if (needsIterationFinishedEvent) {
+        needsIterationFinishedEvent = false;
         event.invoke(listener, flagsBuilder.build());
       }
     }
@@ -288,8 +347,8 @@ public final class ListenerSet<T> {
       if (!released && needsIterationFinishedEvent) {
         // Reset flags before invoking the listener to ensure we keep all new flags that are set by
         // recursive events triggered from this callback.
-        ExoFlags flagsToNotify = flagsBuilder.build();
-        flagsBuilder = new ExoFlags.Builder();
+        FlagSet flagsToNotify = flagsBuilder.build();
+        flagsBuilder = new FlagSet.Builder();
         needsIterationFinishedEvent = false;
         event.invoke(listener, flagsToNotify);
       }

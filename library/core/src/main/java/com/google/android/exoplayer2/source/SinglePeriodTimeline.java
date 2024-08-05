@@ -24,7 +24,15 @@ import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.util.Assertions;
 
-/** A {@link Timeline} consisting of a single period and static window. */
+/**
+ * A {@link Timeline} consisting of a single period and static window.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class SinglePeriodTimeline extends Timeline {
 
   private static final Object UID = new Object();
@@ -147,7 +155,7 @@ public final class SinglePeriodTimeline extends Timeline {
    * @param isDynamic Whether the window may change when the timeline is updated.
    * @param useLiveConfiguration Whether the window is live and {@link MediaItem#liveConfiguration}
    *     is used to configure live playback behaviour.
-   * @param manifest The manifest. May be (@code null}.
+   * @param manifest The manifest. May be {@code null}.
    * @param mediaItem A media item used for {@link Timeline.Window#mediaItem}.
    */
   public SinglePeriodTimeline(

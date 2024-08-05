@@ -30,7 +30,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  * A {@link SectionPayloadReader} that directly outputs the section bytes as sample data.
  *
  * <p>Timestamp adjustment is provided through {@link Format#subsampleOffsetUs}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class PassthroughSectionPayloadReader implements SectionPayloadReader {
 
   private Format format;
@@ -62,9 +68,10 @@ public final class PassthroughSectionPayloadReader implements SectionPayloadRead
   @Override
   public void consume(ParsableByteArray sectionData) {
     assertInitialized();
+    long sampleTimestampUs = timestampAdjuster.getLastAdjustedTimestampUs();
     long subsampleOffsetUs = timestampAdjuster.getTimestampOffsetUs();
-    if (subsampleOffsetUs == C.TIME_UNSET) {
-      // Don't output samples without a known subsample offset.
+    if (sampleTimestampUs == C.TIME_UNSET || subsampleOffsetUs == C.TIME_UNSET) {
+      // Don't output samples without a known sample timestamp and subsample offset.
       return;
     }
     if (subsampleOffsetUs != format.subsampleOffsetUs) {
@@ -73,12 +80,7 @@ public final class PassthroughSectionPayloadReader implements SectionPayloadRead
     }
     int sampleSize = sectionData.bytesLeft();
     output.sampleData(sectionData, sampleSize);
-    output.sampleMetadata(
-        timestampAdjuster.getLastAdjustedTimestampUs(),
-        C.BUFFER_FLAG_KEY_FRAME,
-        sampleSize,
-        0,
-        null);
+    output.sampleMetadata(sampleTimestampUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
   }
 
   @EnsuresNonNull({"timestampAdjuster", "output"})

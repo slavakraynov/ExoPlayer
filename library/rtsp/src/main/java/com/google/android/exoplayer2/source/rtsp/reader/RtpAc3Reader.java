@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.source.rtsp.reader;
 
+import static com.google.android.exoplayer2.source.rtsp.reader.RtpReaderUtils.toSampleTimeUs;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Assertions.checkState;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
@@ -26,10 +27,16 @@ import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.source.rtsp.RtpPayloadFormat;
 import com.google.android.exoplayer2.util.ParsableBitArray;
 import com.google.android.exoplayer2.util.ParsableByteArray;
-import com.google.android.exoplayer2.util.Util;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** Parses an AC3 byte stream carried on RTP packets, and extracts AC3 frames. */
+/**
+ * Parses an AC3 byte stream carried on RTP packets, and extracts AC3 frames.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
 /* package */ public final class RtpAc3Reader implements RtpPayloadReader {
 
   /** AC3 frame types defined in RFC4184 Section 4.1.1. */
@@ -73,7 +80,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void consume(
-      ParsableByteArray data, long timestamp, int sequenceNumber, boolean isFrameBoundary) {
+      ParsableByteArray data, long timestamp, int sequenceNumber, boolean rtpMarker) {
     /*
     AC-3 payload as an RTP payload (RFC4184).
       +-+-+-+-+-+-+-+-+-+-+-+-+-+- .. +-+-+-+-+-+-+-+
@@ -115,7 +122,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         // Falls through.
       case AC3_FRAME_TYPE_NON_INITIAL_FRAGMENT:
         // The content of an AC3 frame is split into multiple RTP packets.
-        processFragmentedPacket(data, isFrameBoundary, frameType, sampleTimeUs);
+        processFragmentedPacket(data, rtpMarker, frameType, sampleTimeUs);
         break;
 
       default:
@@ -138,7 +145,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             /* flags= */ C.BUFFER_FLAG_KEY_FRAME,
             /* size= */ frameSize,
             /* offset= */ 0,
-            /* encryptionData= */ null);
+            /* cryptoData= */ null);
   }
 
   private void processMultiFramePacket(ParsableByteArray data, int numOfFrames, long sampleTimeUs) {
@@ -157,7 +164,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
               /* flags= */ C.BUFFER_FLAG_KEY_FRAME,
               /* size= */ frameInfo.frameSize,
               /* offset= */ 0,
-              /* encryptionData= */ null);
+              /* cryptoData= */ null);
 
       sampleTimeUs += (frameInfo.sampleCount / frameInfo.sampleRate) * C.MICROS_PER_SECOND;
       // Advance the position by the number of bytes read.
@@ -203,17 +210,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             /* flags= */ C.BUFFER_FLAG_KEY_FRAME,
             /* size= */ numBytesPendingMetadataOutput,
             /* offset= */ 0,
-            /* encryptionData= */ null);
+            /* cryptoData= */ null);
     numBytesPendingMetadataOutput = 0;
-  }
-
-  /** Returns the correct sample time from RTP timestamp, accounting for the AC3 sampling rate. */
-  private static long toSampleTimeUs(
-      long startTimeOffsetUs, long rtpTimestamp, long firstReceivedRtpTimestamp, int sampleRate) {
-    return startTimeOffsetUs
-        + Util.scaleLargeTimestamp(
-            rtpTimestamp - firstReceivedRtpTimestamp,
-            /* multiplier= */ C.MICROS_PER_SECOND,
-            /* divisor= */ sampleRate);
   }
 }

@@ -15,18 +15,24 @@
  */
 package com.google.android.exoplayer2.drm;
 
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+
 import android.annotation.SuppressLint;
 import android.media.DeniedByServerException;
+import android.media.MediaCrypto;
 import android.media.MediaCryptoException;
 import android.media.MediaDrm;
 import android.media.MediaDrmException;
 import android.media.NotProvisionedException;
 import android.media.UnsupportedSchemeException;
+import android.media.metrics.LogSessionId;
 import android.os.PersistableBundle;
 import android.text.TextUtils;
+import androidx.annotation.DoNotInline;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.extractor.mp4.PsshAtomUtil;
 import com.google.android.exoplayer2.util.Assertions;
@@ -43,8 +49,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}. */
+/**
+ * An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
 @RequiresApi(18)
+@Deprecated
 public final class FrameworkMediaDrm implements ExoMediaDrm {
 
   private static final String TAG = "FrameworkMediaDrm";
@@ -181,6 +195,19 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
   }
 
   @Override
+  public void setPlayerIdForSession(byte[] sessionId, PlayerId playerId) {
+    if (Util.SDK_INT >= 31) {
+      try {
+        Api31.setLogSessionIdOnMediaDrmSession(mediaDrm, sessionId, playerId);
+      } catch (UnsupportedOperationException e) {
+        Log.w(TAG, "setLogSessionId failed.");
+      }
+    }
+  }
+
+  // Return values of MediaDrm.KeyRequest.getRequestType are equal to KeyRequest.RequestType.
+  @SuppressLint("WrongConstant")
+  @Override
   public KeyRequest getKeyRequest(
       byte[] scope,
       @Nullable List<DrmInitData.SchemeData> schemeDatas,
@@ -199,11 +226,7 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
         mediaDrm.getKeyRequest(scope, initData, mimeType, keyType, optionalParameters);
 
     byte[] requestData = adjustRequestData(uuid, request.getData());
-
-    String licenseServerUrl = request.getDefaultUrl();
-    if (MOCK_LA_URL_VALUE.equals(licenseServerUrl)) {
-      licenseServerUrl = "";
-    }
+    String licenseServerUrl = adjustLicenseServerUrl(request.getDefaultUrl());
     if (TextUtils.isEmpty(licenseServerUrl)
         && schemeData != null
         && !TextUtils.isEmpty(schemeData.licenseServerUrl)) {
@@ -215,6 +238,17 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
         Util.SDK_INT >= 23 ? request.getRequestType() : KeyRequest.REQUEST_TYPE_UNKNOWN;
 
     return new KeyRequest(requestData, licenseServerUrl, requestType);
+  }
+
+  private static String adjustLicenseServerUrl(String licenseServerUrl) {
+    if (MOCK_LA_URL.equals(licenseServerUrl)) {
+      return "";
+    } else if (Util.SDK_INT == 33 && "https://default.url".equals(licenseServerUrl)) {
+      // Work around b/247808112
+      return "";
+    } else {
+      return licenseServerUrl;
+    }
   }
 
   @Override
@@ -242,6 +276,26 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
   @Override
   public Map<String, String> queryKeyStatus(byte[] sessionId) {
     return mediaDrm.queryKeyStatus(sessionId);
+  }
+
+  @Override
+  public boolean requiresSecureDecoder(byte[] sessionId, String mimeType) {
+    if (Util.SDK_INT >= 31) {
+      return Api31.requiresSecureDecoder(mediaDrm, mimeType);
+    }
+
+    MediaCrypto mediaCrypto;
+    try {
+      mediaCrypto = new MediaCrypto(uuid, sessionId);
+    } catch (MediaCryptoException e) {
+      // This shouldn't happen, but if it does then assume that a secure decoder may be required.
+      return true;
+    }
+    try {
+      return mediaCrypto.requiresSecureDecoderComponent(mimeType);
+    } finally {
+      mediaCrypto.release();
+    }
   }
 
   @Override
@@ -292,18 +346,20 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
   }
 
   @Override
-  public FrameworkMediaCrypto createMediaCrypto(byte[] initData) throws MediaCryptoException {
+  public FrameworkCryptoConfig createCryptoConfig(byte[] sessionId) throws MediaCryptoException {
     // Work around a bug prior to Lollipop where L1 Widevine forced into L3 mode would still
     // indicate that it required secure video decoders [Internal ref: b/11428937].
-    boolean forceAllowInsecureDecoderComponents = Util.SDK_INT < 21
-        && C.WIDEVINE_UUID.equals(uuid) && "L3".equals(getPropertyString("securityLevel"));
-    return new FrameworkMediaCrypto(
-        adjustUuid(uuid), initData, forceAllowInsecureDecoderComponents);
+    boolean forceAllowInsecureDecoderComponents =
+        Util.SDK_INT < 21
+            && C.WIDEVINE_UUID.equals(uuid)
+            && "L3".equals(getPropertyString("securityLevel"));
+    return new FrameworkCryptoConfig(
+        adjustUuid(uuid), sessionId, forceAllowInsecureDecoderComponents);
   }
 
   @Override
-  public Class<FrameworkMediaCrypto> getExoMediaCryptoType() {
-    return FrameworkMediaCrypto.class;
+  public @C.CryptoType int getCryptoType() {
+    return C.CRYPTO_TYPE_FRAMEWORK;
   }
 
   private static SchemeData getSchemeData(UUID uuid, List<SchemeData> schemeDatas) {
@@ -418,7 +474,6 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
     return requestData;
   }
 
-  @SuppressLint("WrongConstant") // Suppress spurious lint error [Internal ref: b/32137960]
   private static void forceWidevineL3(MediaDrm mediaDrm) {
     mediaDrm.setPropertyString("securityLevel", "L3");
   }
@@ -473,5 +528,26 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
     newData.putShort((short) (xmlWithMockLaUrl.length() * UTF_16_BYTES_PER_CHARACTER));
     newData.put(xmlWithMockLaUrl.getBytes(Charsets.UTF_16LE));
     return newData.array();
+  }
+
+  @RequiresApi(31)
+  private static class Api31 {
+    private Api31() {}
+
+    @DoNotInline
+    public static boolean requiresSecureDecoder(MediaDrm mediaDrm, String mimeType) {
+      return mediaDrm.requiresSecureDecoder(mimeType);
+    }
+
+    @DoNotInline
+    public static void setLogSessionIdOnMediaDrmSession(
+        MediaDrm mediaDrm, byte[] drmSessionId, PlayerId playerId) {
+      LogSessionId logSessionId = playerId.getLogSessionId();
+      if (!logSessionId.equals(LogSessionId.LOG_SESSION_ID_NONE)) {
+        MediaDrm.PlaybackComponent playbackComponent =
+            checkNotNull(mediaDrm.getPlaybackComponent(drmSessionId));
+        playbackComponent.setLogSessionId(logSessionId);
+      }
+    }
   }
 }

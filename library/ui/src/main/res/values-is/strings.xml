@@ -1,18 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2019 The Android Open Source Project
-
-     Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-
-          http://www.apache.org/licenses/LICENSE-2.0
-
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
--->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="exo_controls_show">Sýna spilunarstýringar</string>
   <string name="exo_controls_hide">Fela spilunarstýringar</string>
@@ -37,22 +23,24 @@
     <item quantity="one">Spóla áfram um %d sekúndu</item>
     <item quantity="other">Spóla áfram um %d sekúndur</item>
   </plurals>
-  <string name="exo_controls_repeat_off_description">Endurtaka ekkert</string>
-  <string name="exo_controls_repeat_one_description">Endurtaka eitt</string>
-  <string name="exo_controls_repeat_all_description">Endurtaka allt</string>
-  <string name="exo_controls_shuffle_on_description">Kveikt á stokkun</string>
-  <string name="exo_controls_shuffle_off_description">Slökkt á stokkun</string>
+  <string name="exo_controls_repeat_off_description">Stilling nú: Endurtaka ekkert. Breyta endurtekningastillingu.</string>
+  <string name="exo_controls_repeat_one_description">Stilling nú: Endurtaka eitt. Breyta endurtekningastillingu.</string>
+  <string name="exo_controls_repeat_all_description">Stilling nú: Endurtaka allt. Breyta endurtekningastillingu.</string>
+  <string name="exo_controls_shuffle_on_description">Slökkva á stokkun</string>
+  <string name="exo_controls_shuffle_off_description">Kveikja á stokkun</string>
   <string name="exo_controls_vr_description">sýndarveruleikastilling</string>
   <string name="exo_controls_cc_enabled_description">Slökkva á skjátexta</string>
   <string name="exo_controls_cc_disabled_description">Kveikja á skjátexta</string>
   <string name="exo_controls_playback_speed">Hraði</string>
-  <string name="exo_controls_playback_speed_normal">Venjulegur</string>
-  <string name="exo_download_description">Sækja</string>
-  <string name="exo_download_notification_channel_name">Niðurhal</string>
-  <string name="exo_download_downloading">Sækir</string>
-  <string name="exo_download_completed">Niðurhali lokið</string>
-  <string name="exo_download_failed">Niðurhal mistókst</string>
-  <string name="exo_download_removing">Fjarlægir niðurhal</string>
+  <string-array name="exo_controls_playback_speeds">
+    <item>0,25x</item>
+    <item>0,5x</item>
+    <item>0,75x</item>
+    <item>Venjulegt</item>
+    <item>1,25x</item>
+    <item>1,5x</item>
+    <item>2x</item>
+  </string-array>
   <string name="exo_track_selection_title_video">Myndskeið</string>
   <string name="exo_track_selection_title_audio">Hljóð</string>
   <string name="exo_track_selection_title_text">Texti</string>

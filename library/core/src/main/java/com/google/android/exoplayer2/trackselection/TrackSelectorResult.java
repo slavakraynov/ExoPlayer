@@ -17,10 +17,19 @@ package com.google.android.exoplayer2.trackselection;
 
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.RendererConfiguration;
+import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.util.Util;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
-/** The result of a {@link TrackSelector} operation. */
+/**
+ * The result of a {@link TrackSelector} operation.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class TrackSelectorResult {
 
   /** The number of selections in the result. Greater than or equal to zero. */
@@ -32,6 +41,8 @@ public final class TrackSelectorResult {
   public final @NullableType RendererConfiguration[] rendererConfigurations;
   /** A {@link ExoTrackSelection} array containing the track selection for each renderer. */
   public final @NullableType ExoTrackSelection[] selections;
+  /** Describe the tracks and which one were selected. */
+  public final Tracks tracks;
   /**
    * An opaque object that will be returned to {@link TrackSelector#onSelectionActivated(Object)}
    * should the selections be activated.
@@ -45,13 +56,34 @@ public final class TrackSelectorResult {
    * @param info An opaque object that will be returned to {@link
    *     TrackSelector#onSelectionActivated(Object)} should the selection be activated. May be
    *     {@code null}.
+   * @deprecated Use {@link #TrackSelectorResult(RendererConfiguration[], ExoTrackSelection[],
+   *     Tracks, Object)}.
    */
+  @Deprecated
   public TrackSelectorResult(
       @NullableType RendererConfiguration[] rendererConfigurations,
       @NullableType ExoTrackSelection[] selections,
       @Nullable Object info) {
+    this(rendererConfigurations, selections, Tracks.EMPTY, info);
+  }
+
+  /**
+   * @param rendererConfigurations A {@link RendererConfiguration} for each renderer. A null entry
+   *     indicates the corresponding renderer should be disabled.
+   * @param selections A {@link ExoTrackSelection} array containing the selection for each renderer.
+   * @param tracks Description of the available tracks and which one were selected.
+   * @param info An opaque object that will be returned to {@link
+   *     TrackSelector#onSelectionActivated(Object)} should the selection be activated. May be
+   *     {@code null}.
+   */
+  public TrackSelectorResult(
+      @NullableType RendererConfiguration[] rendererConfigurations,
+      @NullableType ExoTrackSelection[] selections,
+      Tracks tracks,
+      @Nullable Object info) {
     this.rendererConfigurations = rendererConfigurations;
     this.selections = selections.clone();
+    this.tracks = tracks;
     this.info = info;
     length = rendererConfigurations.length;
   }

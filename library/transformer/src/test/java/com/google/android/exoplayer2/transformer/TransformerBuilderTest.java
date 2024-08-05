@@ -30,28 +30,30 @@ import org.junit.runner.RunWith;
 public class TransformerBuilderTest {
 
   @Test
-  public void setOutputMimeType_unsupportedMimeType_throws() {
-    assertThrows(
-        IllegalStateException.class,
-        () -> new Transformer.Builder().setOutputMimeType(MimeTypes.VIDEO_FLV).build());
-  }
-
-  @Test
-  public void build_withoutContext_throws() {
-    assertThrows(IllegalStateException.class, () -> new Transformer.Builder().build());
-  }
-
-  @Test
-  public void build_removeAudioAndVideo_throws() {
+  public void build_withUnsupportedAudioMimeType_throws() {
     Context context = ApplicationProvider.getApplicationContext();
+    TransformationRequest transformationRequest =
+        new TransformationRequest.Builder().setAudioMimeType(MimeTypes.AUDIO_UNKNOWN).build();
 
     assertThrows(
         IllegalStateException.class,
         () ->
-            new Transformer.Builder()
-                .setContext(context)
-                .setRemoveAudio(true)
-                .setRemoveVideo(true)
+            new Transformer.Builder(context)
+                .setTransformationRequest(transformationRequest)
+                .build());
+  }
+
+  @Test
+  public void build_withUnsupportedVideoMimeType_throws() {
+    Context context = ApplicationProvider.getApplicationContext();
+    TransformationRequest transformationRequest =
+        new TransformationRequest.Builder().setVideoMimeType(MimeTypes.VIDEO_UNKNOWN).build();
+
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            new Transformer.Builder(context)
+                .setTransformationRequest(transformationRequest)
                 .build());
   }
 }

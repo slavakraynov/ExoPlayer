@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.ext.flac;
 
 import static com.google.android.exoplayer2.util.Util.getPcmEncoding;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -40,18 +41,26 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Facilitates the extraction of data from the FLAC container format. */
+/**
+ * Facilitates the extraction of data from the FLAC container format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class FlacExtractor implements Extractor {
 
   /** Factory that returns one extractor which is a {@link FlacExtractor}. */
   public static final ExtractorsFactory FACTORY = () -> new Extractor[] {new FlacExtractor()};
 
-  // LINT.IfChange
   /*
    * Flags in the two FLAC extractors should be kept in sync. If we ever change this then
    * DefaultExtractorsFactory will need modifying, because it currently assumes this is the case.
@@ -62,6 +71,7 @@ public final class FlacExtractor implements Extractor {
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef(
       flag = true,
       value = {FLAG_DISABLE_ID3_METADATA})
@@ -73,7 +83,6 @@ public final class FlacExtractor implements Extractor {
    */
   public static final int FLAG_DISABLE_ID3_METADATA =
       com.google.android.exoplayer2.extractor.flac.FlacExtractor.FLAG_DISABLE_ID3_METADATA;
-  // LINT.ThenChange(../../../../../../../../../../extractor/src/main/java/com/google/android/exoplayer2/extractor/flac/FlacExtractor.java)
 
   private final ParsableByteArray outputBuffer;
   private final boolean id3MetadataDisabled;
@@ -179,7 +188,7 @@ public final class FlacExtractor implements Extractor {
   }
 
   @EnsuresNonNull({"decoderJni", "extractorOutput", "trackOutput"}) // Ensures initialized.
-  @SuppressWarnings({"contracts.postcondition.not.satisfied"})
+  @SuppressWarnings("nullness:contracts.postcondition")
   private FlacDecoderJni initDecoderJni(ExtractorInput input) {
     FlacDecoderJni decoderJni = Assertions.checkNotNull(this.decoderJni);
     decoderJni.setData(input);
@@ -188,7 +197,7 @@ public final class FlacExtractor implements Extractor {
 
   @RequiresNonNull({"decoderJni", "extractorOutput", "trackOutput"}) // Requires initialized.
   @EnsuresNonNull({"streamMetadata", "outputFrameHolder"}) // Ensures stream metadata decoded.
-  @SuppressWarnings({"contracts.postcondition.not.satisfied"})
+  @SuppressWarnings("nullness:contracts.postcondition")
   private void decodeStreamMetadata(ExtractorInput input) throws IOException {
     if (streamMetadataDecoded) {
       return;
@@ -288,7 +297,7 @@ public final class FlacExtractor implements Extractor {
     sampleData.setPosition(0);
     output.sampleData(sampleData, size);
     output.sampleMetadata(
-        timeUs, C.BUFFER_FLAG_KEY_FRAME, size, /* offset= */ 0, /* encryptionData= */ null);
+        timeUs, C.BUFFER_FLAG_KEY_FRAME, size, /* offset= */ 0, /* cryptoData= */ null);
   }
 
   /** A {@link SeekMap} implementation using a SeekTable within the Flac stream. */

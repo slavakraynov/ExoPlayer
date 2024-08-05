@@ -29,10 +29,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.source.MediaPeriod;
+import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.MediaSource.MediaSourceCaller;
-import com.google.android.exoplayer2.source.MediaSourceFactory;
 import com.google.android.exoplayer2.source.SinglePeriodTimeline;
 import com.google.android.exoplayer2.source.ads.AdsLoader.EventListener;
 import com.google.android.exoplayer2.testutil.FakeMediaSource;
@@ -60,7 +61,7 @@ public final class AdsMediaSourceTest {
           /* isDynamic= */ false,
           /* useLiveConfiguration= */ false,
           /* manifest= */ null,
-          MediaItem.fromUri(Uri.EMPTY));
+          MediaItem.fromUri(Uri.parse("https://google.com/empty")));
   private static final Object PREROLL_AD_PERIOD_UID =
       PREROLL_AD_TIMELINE.getUidOfPeriod(/* periodIndex= */ 0);
 
@@ -72,7 +73,7 @@ public final class AdsMediaSourceTest {
           /* isDynamic= */ false,
           /* useLiveConfiguration= */ false,
           /* manifest= */ null,
-          MediaItem.fromUri(Uri.EMPTY));
+          MediaItem.fromUri(Uri.parse("https://google.com/empty")));
   private static final Object CONTENT_PERIOD_UID =
       CONTENT_TIMELINE.getUidOfPeriod(/* periodIndex= */ 0);
 
@@ -80,7 +81,8 @@ public final class AdsMediaSourceTest {
       new AdPlaybackState(/* adsId= */ new Object(), /* adGroupTimesUs...= */ 0)
           .withContentDurationUs(CONTENT_DURATION_US)
           .withAdCount(/* adGroupIndex= */ 0, /* adCount= */ 1)
-          .withAdUri(/* adGroupIndex= */ 0, /* adIndexInAdGroup= */ 0, Uri.EMPTY)
+          .withAvailableAdUri(
+              /* adGroupIndex= */ 0, /* adIndexInAdGroup= */ 0, Uri.parse("https://google.com/ad"))
           .withPlayedAd(/* adGroupIndex= */ 0, /* adIndexInAdGroup= */ 0)
           .withAdResumePositionUs(/* adResumePositionUs= */ 0);
 
@@ -100,7 +102,7 @@ public final class AdsMediaSourceTest {
     // later.
     contentMediaSource = new FakeMediaSource(/* timeline= */ null);
     prerollAdMediaSource = new FakeMediaSource(/* timeline= */ null);
-    MediaSourceFactory adMediaSourceFactory = mock(MediaSourceFactory.class);
+    MediaSource.Factory adMediaSourceFactory = mock(MediaSource.Factory.class);
     when(adMediaSourceFactory.createMediaSource(any(MediaItem.class)))
         .thenReturn(prerollAdMediaSource);
 
@@ -117,7 +119,8 @@ public final class AdsMediaSourceTest {
             adMediaSourceFactory,
             mockAdsLoader,
             mockAdViewProvider);
-    adsMediaSource.prepareSource(mockMediaSourceCaller, /* mediaTransferListener= */ null);
+    adsMediaSource.prepareSource(
+        mockMediaSourceCaller, /* mediaTransferListener= */ null, PlayerId.UNSET);
     shadowOf(Looper.getMainLooper()).idle();
     verify(mockAdsLoader)
         .start(

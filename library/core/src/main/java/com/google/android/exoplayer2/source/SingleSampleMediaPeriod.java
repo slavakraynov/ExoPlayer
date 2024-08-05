@@ -24,6 +24,7 @@ import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy.LoadErrorInfo;
@@ -42,7 +43,15 @@ import java.util.Arrays;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** A {@link MediaPeriod} with a single sample. */
+/**
+ * A {@link MediaPeriod} with a single sample.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class SingleSampleMediaPeriod
     implements MediaPeriod, Loader.Callback<SingleSampleMediaPeriod.SourceLoadable> {
 
@@ -282,7 +291,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             C.SELECTION_REASON_UNKNOWN,
             /* trackSelectionData= */ null,
             /* mediaStartTimeMs= */ 0,
-            C.usToMs(durationUs));
+            Util.usToMs(durationUs));
     long retryDelay =
         loadErrorHandlingPolicy.getRetryDelayMsFor(
             new LoadErrorInfo(loadEventInfo, mediaLoadData, error, errorCount));
@@ -351,6 +360,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     public int readData(
         FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
       maybeNotifyDownstreamFormat();
+      if (loadingFinished && sampleData == null) {
+        streamState = STREAM_STATE_END_OF_STREAM;
+      }
+
       if (streamState == STREAM_STATE_END_OF_STREAM) {
         buffer.addFlag(C.BUFFER_FLAG_END_OF_STREAM);
         return C.RESULT_BUFFER_READ;
@@ -365,12 +378,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       if (!loadingFinished) {
         return C.RESULT_NOTHING_READ;
       }
-
-      if (sampleData == null) {
-        buffer.addFlag(C.BUFFER_FLAG_END_OF_STREAM);
-        streamState = STREAM_STATE_END_OF_STREAM;
-        return C.RESULT_BUFFER_READ;
-      }
+      Assertions.checkNotNull(sampleData);
 
       buffer.addFlag(C.BUFFER_FLAG_KEY_FRAME);
       buffer.timeUs = 0;
@@ -446,7 +454,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           result = dataSource.read(sampleData, sampleSize, sampleData.length - sampleSize);
         }
       } finally {
-        Util.closeQuietly(dataSource);
+        DataSourceUtil.closeQuietly(dataSource);
       }
     }
   }

@@ -17,10 +17,8 @@ package com.google.android.exoplayer2.source.smoothstreaming.offline;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 
-import android.net.Uri;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.offline.SegmentDownloader;
-import com.google.android.exoplayer2.offline.StreamKey;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest.StreamElement;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifestParser;
@@ -43,7 +41,7 @@ import java.util.concurrent.Executor;
  * CacheDataSource.Factory cacheDataSourceFactory =
  *     new CacheDataSource.Factory()
  *         .setCache(cache)
- *         .setUpstreamDataSourceFactory(new DefaultHttpDataSourceFactory(userAgent));
+ *         .setUpstreamDataSourceFactory(new DefaultHttpDataSource.Factory());
  * // Create a downloader for the first track of the first stream element.
  * SsDownloader ssDownloader =
  *     new SsDownloader(
@@ -58,18 +56,14 @@ import java.util.concurrent.Executor;
  * SsMediaSource mediaSource =
  *     new SsMediaSource.Factory(cacheDataSourceFactory).createMediaSource(mediaItem);
  * }</pre>
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class SsDownloader extends SegmentDownloader<SsManifest> {
-
-  /**
-   * @deprecated Use {@link #SsDownloader(MediaItem, CacheDataSource.Factory, Executor)} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public SsDownloader(
-      Uri manifestUri, List<StreamKey> streamKeys, CacheDataSource.Factory cacheDataSourceFactory) {
-    this(manifestUri, streamKeys, cacheDataSourceFactory, Runnable::run);
-  }
 
   /**
    * Creates an instance.
@@ -80,21 +74,6 @@ public final class SsDownloader extends SegmentDownloader<SsManifest> {
    */
   public SsDownloader(MediaItem mediaItem, CacheDataSource.Factory cacheDataSourceFactory) {
     this(mediaItem, cacheDataSourceFactory, Runnable::run);
-  }
-
-  /**
-   * @deprecated Use {@link #SsDownloader(MediaItem, CacheDataSource.Factory, Executor)} instead.
-   */
-  @Deprecated
-  public SsDownloader(
-      Uri manifestUri,
-      List<StreamKey> streamKeys,
-      CacheDataSource.Factory cacheDataSourceFactory,
-      Executor executor) {
-    this(
-        new MediaItem.Builder().setUri(manifestUri).setStreamKeys(streamKeys).build(),
-        cacheDataSourceFactory,
-        executor);
   }
 
   /**
@@ -114,11 +93,30 @@ public final class SsDownloader extends SegmentDownloader<SsManifest> {
             .buildUpon()
             .setUri(
                 Util.fixSmoothStreamingIsmManifestUri(
-                    checkNotNull(mediaItem.playbackProperties).uri))
+                    checkNotNull(mediaItem.localConfiguration).uri))
             .build(),
         new SsManifestParser(),
         cacheDataSourceFactory,
-        executor);
+        executor,
+        DEFAULT_MAX_MERGED_SEGMENT_START_TIME_DIFF_MS);
+  }
+
+  /**
+   * @deprecated Use {@link SsDownloader#SsDownloader(MediaItem, Parser, CacheDataSource.Factory,
+   *     Executor, long)} instead.
+   */
+  @Deprecated
+  public SsDownloader(
+      MediaItem mediaItem,
+      Parser<SsManifest> manifestParser,
+      CacheDataSource.Factory cacheDataSourceFactory,
+      Executor executor) {
+    this(
+        mediaItem,
+        manifestParser,
+        cacheDataSourceFactory,
+        executor,
+        DEFAULT_MAX_MERGED_SEGMENT_START_TIME_DIFF_MS);
   }
 
   /**
@@ -131,18 +129,27 @@ public final class SsDownloader extends SegmentDownloader<SsManifest> {
    * @param executor An {@link Executor} used to make requests for the media being downloaded.
    *     Providing an {@link Executor} that uses multiple threads will speed up the download by
    *     allowing parts of it to be executed in parallel.
+   * @param maxMergedSegmentStartTimeDiffMs The maximum difference of the start time of two
+   *     segments, up to which the segments (of the same URI) should be merged into a single
+   *     download segment, in milliseconds.
    */
   public SsDownloader(
       MediaItem mediaItem,
       Parser<SsManifest> manifestParser,
       CacheDataSource.Factory cacheDataSourceFactory,
-      Executor executor) {
-    super(mediaItem, manifestParser, cacheDataSourceFactory, executor);
+      Executor executor,
+      long maxMergedSegmentStartTimeDiffMs) {
+    super(
+        mediaItem,
+        manifestParser,
+        cacheDataSourceFactory,
+        executor,
+        maxMergedSegmentStartTimeDiffMs);
   }
 
   @Override
   protected List<Segment> getSegments(
-      DataSource dataSource, SsManifest manifest, boolean allowIncompleteList) {
+      DataSource dataSource, SsManifest manifest, boolean removing) {
     ArrayList<Segment> segments = new ArrayList<>();
     for (StreamElement streamElement : manifest.streamElements) {
       for (int i = 0; i < streamElement.formats.length; i++) {
@@ -156,5 +163,4 @@ public final class SsDownloader extends SegmentDownloader<SsManifest> {
     }
     return segments;
   }
-
 }

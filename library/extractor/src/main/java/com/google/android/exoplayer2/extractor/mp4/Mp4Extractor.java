@@ -22,13 +22,14 @@ import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
-import android.util.Pair;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
+import com.google.android.exoplayer2.audio.Ac3Util;
 import com.google.android.exoplayer2.audio.Ac4Util;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
@@ -39,6 +40,7 @@ import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
+import com.google.android.exoplayer2.extractor.TrueHdSampleRechunker;
 import com.google.android.exoplayer2.extractor.mp4.Atom.ContainerAtom;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.mp4.MotionPhotoMetadata;
@@ -51,14 +53,21 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
-import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Extracts data from the MP4 container format. */
+/**
+ * Extracts data from the MP4 container format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class Mp4Extractor implements Extractor, SeekMap {
 
   /** Factory for {@link Mp4Extractor} instances. */
@@ -71,6 +80,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef(
       flag = true,
       value = {
@@ -98,6 +108,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
   /** Parser states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     STATE_READING_ATOM_HEADER,
     STATE_READING_ATOM_PAYLOAD,
@@ -114,6 +125,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
   /** Supported file types. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({FILE_TYPE_MP4, FILE_TYPE_QUICKTIME, FILE_TYPE_HEIC})
   private @interface FileType {}
 
@@ -145,7 +157,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
   private final SefReader sefReader;
   private final List<Metadata.Entry> slowMotionMetadataEntries;
 
-  @State private int parserState;
+  private @State int parserState;
   private int atomType;
   private long atomSize;
   private int atomHeaderBytesRead;
@@ -157,18 +169,16 @@ public final class Mp4Extractor implements Extractor, SeekMap {
   private int sampleCurrentNalBytesRemaining;
 
   // Extractor outputs.
-  private @MonotonicNonNull ExtractorOutput extractorOutput;
-  private Mp4Track @MonotonicNonNull [] tracks;
+  private ExtractorOutput extractorOutput;
+  private Mp4Track[] tracks;
 
   private long @MonotonicNonNull [][] accumulatedSampleSizes;
   private int firstVideoTrackIndex;
   private long durationUs;
-  @FileType private int fileType;
+  private @FileType int fileType;
   @Nullable private MotionPhotoMetadata motionPhotoMetadata;
 
-  /**
-   * Creates a new extractor for unfragmented MP4 streams.
-   */
+  /** Creates a new extractor for unfragmented MP4 streams. */
   public Mp4Extractor() {
     this(/* flags= */ 0);
   }
@@ -191,6 +201,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     nalLength = new ParsableByteArray(4);
     scratch = new ParsableByteArray();
     sampleTrackIndex = C.INDEX_UNSET;
+    extractorOutput = ExtractorOutput.PLACEHOLDER;
+    tracks = new Mp4Track[0];
   }
 
   @Override
@@ -221,8 +233,13 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         sefReader.reset();
         slowMotionMetadataEntries.clear();
       }
-    } else if (tracks != null) {
-      updateSampleIndices(timeUs);
+    } else {
+      for (Mp4Track track : tracks) {
+        updateSampleIndex(track, timeUs);
+        if (track.trueHdSampleRechunker != null) {
+          track.trueHdSampleRechunker.reset();
+        }
+      }
     }
   }
 
@@ -269,18 +286,36 @@ public final class Mp4Extractor implements Extractor, SeekMap {
 
   @Override
   public SeekPoints getSeekPoints(long timeUs) {
-    if (checkNotNull(tracks).length == 0) {
+    return getSeekPoints(timeUs, /* trackId= */ C.INDEX_UNSET);
+  }
+
+  // Non-inherited public methods.
+
+  /**
+   * Equivalent to {@link SeekMap#getSeekPoints(long)}, except it adds the {@code trackId}
+   * parameter.
+   *
+   * @param timeUs A seek time in microseconds.
+   * @param trackId The id of the track on which to seek for {@link SeekPoints}. May be {@link
+   *     C#INDEX_UNSET} if the extractor is expected to define the strategy for generating {@link
+   *     SeekPoints}.
+   * @return The corresponding seek points.
+   */
+  public SeekPoints getSeekPoints(long timeUs, int trackId) {
+    if (tracks.length == 0) {
       return new SeekPoints(SeekPoint.START);
     }
 
     long firstTimeUs;
     long firstOffset;
     long secondTimeUs = C.TIME_UNSET;
-    long secondOffset = C.POSITION_UNSET;
+    long secondOffset = C.INDEX_UNSET;
 
+    // Note that the id matches the index in tracks.
+    int mainTrackIndex = trackId != C.INDEX_UNSET ? trackId : firstVideoTrackIndex;
     // If we have a video track, use it to establish one or two seek points.
-    if (firstVideoTrackIndex != C.INDEX_UNSET) {
-      TrackSampleTable sampleTable = tracks[firstVideoTrackIndex].sampleTable;
+    if (mainTrackIndex != C.INDEX_UNSET) {
+      TrackSampleTable sampleTable = tracks[mainTrackIndex].sampleTable;
       int sampleIndex = getSynchronizationSampleIndex(sampleTable, timeUs);
       if (sampleIndex == C.INDEX_UNSET) {
         return new SeekPoints(SeekPoint.START);
@@ -300,13 +335,15 @@ public final class Mp4Extractor implements Extractor, SeekMap {
       firstOffset = Long.MAX_VALUE;
     }
 
-    // Take into account other tracks.
-    for (int i = 0; i < tracks.length; i++) {
-      if (i != firstVideoTrackIndex) {
-        TrackSampleTable sampleTable = tracks[i].sampleTable;
-        firstOffset = maybeAdjustSeekOffset(sampleTable, firstTimeUs, firstOffset);
-        if (secondTimeUs != C.TIME_UNSET) {
-          secondOffset = maybeAdjustSeekOffset(sampleTable, secondTimeUs, secondOffset);
+    if (trackId == C.INDEX_UNSET) {
+      // Take into account other tracks, but only if the caller has not specified a trackId.
+      for (int i = 0; i < tracks.length; i++) {
+        if (i != firstVideoTrackIndex) {
+          TrackSampleTable sampleTable = tracks[i].sampleTable;
+          firstOffset = maybeAdjustSeekOffset(sampleTable, firstTimeUs, firstOffset);
+          if (secondTimeUs != C.TIME_UNSET) {
+            secondOffset = maybeAdjustSeekOffset(sampleTable, secondTimeUs, secondOffset);
+          }
         }
       }
     }
@@ -362,7 +399,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     }
 
     if (atomSize < atomHeaderBytesRead) {
-      throw new ParserException("Atom size less than header length (unsupported).");
+      throw ParserException.createForUnsupportedContainerFeature(
+          "Atom size less than header length (unsupported).");
     }
 
     if (shouldParseContainerAtom(atomType)) {
@@ -426,8 +464,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     return seekRequired && parserState != STATE_READING_SAMPLE;
   }
 
-  @ReadResult
-  private int readSefData(ExtractorInput input, PositionHolder seekPosition) throws IOException {
+  private @ReadResult int readSefData(ExtractorInput input, PositionHolder seekPosition)
+      throws IOException {
     @ReadResult int result = sefReader.read(input, seekPosition, slowMotionMetadataEntries);
     if (result == RESULT_SEEK && seekPosition.position == 0) {
       enterReadingAtomHeaderState();
@@ -452,9 +490,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     }
   }
 
-  /**
-   * Updates the stored track metadata to reflect the contents of the specified moov atom.
-   */
+  /** Updates the stored track metadata to reflect the contents of the specified moov atom. */
   private void processMoovAtom(ContainerAtom moov) throws ParserException {
     int firstVideoTrackIndex = C.INDEX_UNSET;
     long durationUs = C.TIME_UNSET;
@@ -463,14 +499,15 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     // Process metadata.
     @Nullable Metadata udtaMetaMetadata = null;
     @Nullable Metadata smtaMetadata = null;
+    @Nullable Metadata xyzMetadata = null;
     boolean isQuickTime = fileType == FILE_TYPE_QUICKTIME;
     GaplessInfoHolder gaplessInfoHolder = new GaplessInfoHolder();
     @Nullable Atom.LeafAtom udta = moov.getLeafAtomOfType(Atom.TYPE_udta);
     if (udta != null) {
-      Pair<@NullableType Metadata, @NullableType Metadata> udtaMetadata =
-          AtomParsers.parseUdta(udta);
-      udtaMetaMetadata = udtaMetadata.first;
-      smtaMetadata = udtaMetadata.second;
+      AtomParsers.UdtaInfo udtaInfo = AtomParsers.parseUdta(udta);
+      udtaMetaMetadata = udtaInfo.metaMetadata;
+      smtaMetadata = udtaInfo.smtaMetadata;
+      xyzMetadata = udtaInfo.xyzMetadata;
       if (udtaMetaMetadata != null) {
         gaplessInfoHolder.setFromMetadata(udtaMetaMetadata);
       }
@@ -480,6 +517,9 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     if (meta != null) {
       mdtaMetadata = AtomParsers.parseMdtaFromMeta(meta);
     }
+
+    Metadata mvhdMetadata =
+        AtomParsers.parseMvhd(checkNotNull(moov.getLeafAtomOfType(Atom.TYPE_mvhd)).data).metadata;
 
     boolean ignoreEditLists = (flags & FLAG_WORKAROUND_IGNORE_EDIT_LISTS) != 0;
     List<TrackSampleTable> trackSampleTables =
@@ -492,7 +532,6 @@ public final class Mp4Extractor implements Extractor, SeekMap {
             isQuickTime,
             /* modifyTrackFunction= */ track -> track);
 
-    ExtractorOutput extractorOutput = checkNotNull(this.extractorOutput);
     int trackCount = trackSampleTables.size();
     for (int i = 0; i < trackCount; i++) {
       TrackSampleTable trackSampleTable = trackSampleTables.get(i);
@@ -503,12 +542,19 @@ public final class Mp4Extractor implements Extractor, SeekMap {
       long trackDurationUs =
           track.durationUs != C.TIME_UNSET ? track.durationUs : trackSampleTable.durationUs;
       durationUs = max(durationUs, trackDurationUs);
-      Mp4Track mp4Track = new Mp4Track(track, trackSampleTable,
-          extractorOutput.track(i, track.type));
+      Mp4Track mp4Track =
+          new Mp4Track(track, trackSampleTable, extractorOutput.track(i, track.type));
 
-      // Each sample has up to three bytes of overhead for the start code that replaces its length.
-      // Allow ten source samples per output sample, like the platform extractor.
-      int maxInputSize = trackSampleTable.maximumSize + 3 * 10;
+      int maxInputSize;
+      if (MimeTypes.AUDIO_TRUEHD.equals(track.format.sampleMimeType)) {
+        // TrueHD groups samples per chunks of TRUEHD_RECHUNK_SAMPLE_COUNT samples.
+        maxInputSize = trackSampleTable.maximumSize * Ac3Util.TRUEHD_RECHUNK_SAMPLE_COUNT;
+      } else {
+        // Each sample has up to three bytes of overhead for the start code that replaces its
+        // length. Allow ten source samples per output sample, like the platform extractor.
+        maxInputSize = trackSampleTable.maximumSize + 3 * 10;
+      }
+
       Format.Builder formatBuilder = track.format.buildUpon();
       formatBuilder.setMaxInputSize(maxInputSize);
       if (track.type == C.TRACK_TYPE_VIDEO
@@ -525,7 +571,9 @@ public final class Mp4Extractor implements Extractor, SeekMap {
           mdtaMetadata,
           formatBuilder,
           smtaMetadata,
-          slowMotionMetadataEntries.isEmpty() ? null : new Metadata(slowMotionMetadataEntries));
+          slowMotionMetadataEntries.isEmpty() ? null : new Metadata(slowMotionMetadataEntries),
+          xyzMetadata,
+          mvhdMetadata);
       mp4Track.trackOutput.format(formatBuilder.build());
 
       if (track.type == C.TRACK_TYPE_VIDEO && firstVideoTrackIndex == C.INDEX_UNSET) {
@@ -565,11 +613,12 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         return RESULT_END_OF_INPUT;
       }
     }
-    Mp4Track track = castNonNull(tracks)[sampleTrackIndex];
+    Mp4Track track = tracks[sampleTrackIndex];
     TrackOutput trackOutput = track.trackOutput;
     int sampleIndex = track.sampleIndex;
     long position = track.sampleTable.offsets[sampleIndex];
     int sampleSize = track.sampleTable.sizes[sampleIndex];
+    @Nullable TrueHdSampleRechunker trueHdSampleRechunker = track.trueHdSampleRechunker;
     long skipAmount = position - inputPosition + sampleBytesRead;
     if (skipAmount < 0 || skipAmount >= RELOAD_MINIMUM_SEEK_DISTANCE) {
       positionHolder.position = position;
@@ -602,7 +651,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
           nalLength.setPosition(0);
           int nalLengthInt = nalLength.readInt();
           if (nalLengthInt < 0) {
-            throw new ParserException("Invalid NAL length");
+            throw ParserException.createForMalformedContainer(
+                "Invalid NAL length", /* cause= */ null);
           }
           sampleCurrentNalBytesRemaining = nalLengthInt;
           // Write a start code for the current NAL unit.
@@ -626,7 +676,10 @@ public final class Mp4Extractor implements Extractor, SeekMap {
           sampleBytesWritten += Ac4Util.SAMPLE_HEADER_SIZE;
         }
         sampleSize += Ac4Util.SAMPLE_HEADER_SIZE;
+      } else if (trueHdSampleRechunker != null) {
+        trueHdSampleRechunker.startSample(input);
       }
+
       while (sampleBytesWritten < sampleSize) {
         int writtenBytes = trackOutput.sampleData(input, sampleSize - sampleBytesWritten, false);
         sampleBytesRead += writtenBytes;
@@ -634,8 +687,20 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         sampleCurrentNalBytesRemaining -= writtenBytes;
       }
     }
-    trackOutput.sampleMetadata(track.sampleTable.timestampsUs[sampleIndex],
-        track.sampleTable.flags[sampleIndex], sampleSize, 0, null);
+
+    long timeUs = track.sampleTable.timestampsUs[sampleIndex];
+    @C.BufferFlags int flags = track.sampleTable.flags[sampleIndex];
+    if (trueHdSampleRechunker != null) {
+      trueHdSampleRechunker.sampleMetadata(
+          trackOutput, timeUs, flags, sampleSize, /* offset= */ 0, /* cryptoData= */ null);
+      if (sampleIndex + 1 == track.sampleTable.sampleCount) {
+        trueHdSampleRechunker.outputPendingSampleMetadata(trackOutput, /* cryptoData= */ null);
+      }
+    } else {
+      trackOutput.sampleMetadata(
+          timeUs, flags, sampleSize, /* offset= */ 0, /* cryptoData= */ null);
+    }
+
     track.sampleIndex++;
     sampleTrackIndex = C.INDEX_UNSET;
     sampleBytesRead = 0;
@@ -665,7 +730,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     long minAccumulatedBytes = Long.MAX_VALUE;
     boolean minAccumulatedBytesRequiresReload = true;
     int minAccumulatedBytesTrackIndex = C.INDEX_UNSET;
-    for (int trackIndex = 0; trackIndex < castNonNull(tracks).length; trackIndex++) {
+    for (int trackIndex = 0; trackIndex < tracks.length; trackIndex++) {
       Mp4Track track = tracks[trackIndex];
       int sampleIndex = track.sampleIndex;
       if (sampleIndex == track.sampleTable.sampleCount) {
@@ -695,27 +760,21 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         : minAccumulatedBytesTrackIndex;
   }
 
-  /**
-   * Updates every track's sample index to point its latest sync sample before/at {@code timeUs}.
-   */
-  @RequiresNonNull("tracks")
-  private void updateSampleIndices(long timeUs) {
-    for (Mp4Track track : tracks) {
-      TrackSampleTable sampleTable = track.sampleTable;
-      int sampleIndex = sampleTable.getIndexOfEarlierOrEqualSynchronizationSample(timeUs);
-      if (sampleIndex == C.INDEX_UNSET) {
-        // Handle the case where the requested time is before the first synchronization sample.
-        sampleIndex = sampleTable.getIndexOfLaterOrEqualSynchronizationSample(timeUs);
-      }
-      track.sampleIndex = sampleIndex;
+  /** Updates a track's sample index to point its latest sync sample before/at {@code timeUs}. */
+  private void updateSampleIndex(Mp4Track track, long timeUs) {
+    TrackSampleTable sampleTable = track.sampleTable;
+    int sampleIndex = sampleTable.getIndexOfEarlierOrEqualSynchronizationSample(timeUs);
+    if (sampleIndex == C.INDEX_UNSET) {
+      // Handle the case where the requested time is before the first synchronization sample.
+      sampleIndex = sampleTable.getIndexOfLaterOrEqualSynchronizationSample(timeUs);
     }
+    track.sampleIndex = sampleIndex;
   }
 
   /** Processes the end of stream in case there is not atom left to read. */
   private void processEndOfStreamReadingAtomHeader() {
     if (fileType == FILE_TYPE_HEIC && (flags & FLAG_READ_MOTION_PHOTO_METADATA) != 0) {
       // Add image track and prepare media.
-      ExtractorOutput extractorOutput = checkNotNull(this.extractorOutput);
       TrackOutput trackOutput = extractorOutput.track(/* id= */ 0, C.TRACK_TYPE_IMAGE);
       @Nullable
       Metadata metadata = motionPhotoMetadata == null ? null : new Metadata(motionPhotoMetadata);
@@ -832,8 +891,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
    * @param atomData The ftyp atom data.
    * @return The {@link FileType}.
    */
-  @FileType
-  private static int processFtypAtom(ParsableByteArray atomData) {
+  private static @FileType int processFtypAtom(ParsableByteArray atomData) {
     atomData.setPosition(Atom.HEADER_SIZE);
     int majorBrand = atomData.readInt();
     @FileType int fileType = brandToFileType(majorBrand);
@@ -850,8 +908,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     return FILE_TYPE_MP4;
   }
 
-  @FileType
-  private static int brandToFileType(int brand) {
+  private static @FileType int brandToFileType(int brand) {
     switch (brand) {
       case BRAND_QUICKTIME:
         return FILE_TYPE_QUICKTIME;
@@ -900,6 +957,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     public final Track track;
     public final TrackSampleTable sampleTable;
     public final TrackOutput trackOutput;
+    @Nullable public final TrueHdSampleRechunker trueHdSampleRechunker;
 
     public int sampleIndex;
 
@@ -907,8 +965,10 @@ public final class Mp4Extractor implements Extractor, SeekMap {
       this.track = track;
       this.sampleTable = sampleTable;
       this.trackOutput = trackOutput;
+      trueHdSampleRechunker =
+          MimeTypes.AUDIO_TRUEHD.equals(track.format.sampleMimeType)
+              ? new TrueHdSampleRechunker()
+              : null;
     }
-
   }
-
 }

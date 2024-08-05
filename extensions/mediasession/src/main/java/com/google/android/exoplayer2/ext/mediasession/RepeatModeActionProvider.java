@@ -19,22 +19,27 @@ import android.content.Context;
 import android.os.Bundle;
 import android.support.v4.media.session.PlaybackStateCompat;
 import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.util.RepeatModeUtil;
 
-/** Provides a custom action for toggling repeat modes. */
+/**
+ * Provides a custom action for toggling repeat modes.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class RepeatModeActionProvider implements MediaSessionConnector.CustomActionProvider {
 
   /** The default repeat toggle modes. */
-  @RepeatModeUtil.RepeatToggleModes
-  public static final int DEFAULT_REPEAT_TOGGLE_MODES =
+  public static final @RepeatModeUtil.RepeatToggleModes int DEFAULT_REPEAT_TOGGLE_MODES =
       RepeatModeUtil.REPEAT_TOGGLE_MODE_ONE | RepeatModeUtil.REPEAT_TOGGLE_MODE_ALL;
 
   private static final String ACTION_REPEAT_MODE = "ACTION_EXO_REPEAT_MODE";
 
-  @RepeatModeUtil.RepeatToggleModes
-  private final int repeatToggleModes;
+  private final @RepeatModeUtil.RepeatToggleModes int repeatToggleModes;
   private final CharSequence repeatAllDescription;
   private final CharSequence repeatOneDescription;
   private final CharSequence repeatOffDescription;
@@ -65,12 +70,11 @@ public final class RepeatModeActionProvider implements MediaSessionConnector.Cus
   }
 
   @Override
-  public void onCustomAction(
-      Player player, ControlDispatcher controlDispatcher, String action, @Nullable Bundle extras) {
+  public void onCustomAction(Player player, String action, @Nullable Bundle extras) {
     int mode = player.getRepeatMode();
     int proposedMode = RepeatModeUtil.getNextRepeatMode(mode, repeatToggleModes);
     if (mode != proposedMode) {
-      controlDispatcher.dispatchSetRepeatMode(player, proposedMode);
+      player.setRepeatMode(proposedMode);
     }
   }
 
@@ -93,9 +97,9 @@ public final class RepeatModeActionProvider implements MediaSessionConnector.Cus
         iconResourceId = R.drawable.exo_media_action_repeat_off;
         break;
     }
-    PlaybackStateCompat.CustomAction.Builder repeatBuilder = new PlaybackStateCompat.CustomAction
-        .Builder(ACTION_REPEAT_MODE, actionLabel, iconResourceId);
+    PlaybackStateCompat.CustomAction.Builder repeatBuilder =
+        new PlaybackStateCompat.CustomAction.Builder(
+            ACTION_REPEAT_MODE, actionLabel, iconResourceId);
     return repeatBuilder.build();
   }
-
 }

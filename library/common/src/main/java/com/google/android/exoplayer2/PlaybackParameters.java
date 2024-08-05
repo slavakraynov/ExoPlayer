@@ -17,15 +17,20 @@ package com.google.android.exoplayer2;
 
 import android.os.Bundle;
 import androidx.annotation.CheckResult;
-import androidx.annotation.IntDef;
+import androidx.annotation.FloatRange;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
-/** Parameters that apply to playback, including speed setting. */
+/**
+ * Parameters that apply to playback, including speed setting.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class PlaybackParameters implements Bundleable {
 
   /** The default playback parameters: real-time playback with no silence skipping. */
@@ -45,7 +50,7 @@ public final class PlaybackParameters implements Bundleable {
    *
    * @param speed The factor by which playback will be sped up. Must be greater than zero.
    */
-  public PlaybackParameters(float speed) {
+  public PlaybackParameters(@FloatRange(from = 0, fromInclusive = false) float speed) {
     this(speed, /* pitch= */ 1f);
   }
 
@@ -57,7 +62,9 @@ public final class PlaybackParameters implements Bundleable {
    *     zero. Useful values are {@code 1} (to time-stretch audio) and the same value as passed in
    *     as the {@code speed} (to resample audio, which is useful for slow-motion videos).
    */
-  public PlaybackParameters(float speed, float pitch) {
+  public PlaybackParameters(
+      @FloatRange(from = 0, fromInclusive = false) float speed,
+      @FloatRange(from = 0, fromInclusive = false) float pitch) {
     Assertions.checkArgument(speed > 0);
     Assertions.checkArgument(pitch > 0);
     this.speed = speed;
@@ -79,11 +86,11 @@ public final class PlaybackParameters implements Bundleable {
   /**
    * Returns a copy with the given speed.
    *
-   * @param speed The new speed.
+   * @param speed The new speed. Must be greater than zero.
    * @return The copied playback parameters.
    */
   @CheckResult
-  public PlaybackParameters withSpeed(float speed) {
+  public PlaybackParameters withSpeed(@FloatRange(from = 0, fromInclusive = false) float speed) {
     return new PlaybackParameters(speed, pitch);
   }
 
@@ -114,31 +121,22 @@ public final class PlaybackParameters implements Bundleable {
 
   // Bundleable implementation.
 
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef({FIELD_SPEED, FIELD_PITCH})
-  private @interface FieldNumber {}
-
-  private static final int FIELD_SPEED = 0;
-  private static final int FIELD_PITCH = 1;
+  private static final String FIELD_SPEED = Util.intToStringMaxRadix(0);
+  private static final String FIELD_PITCH = Util.intToStringMaxRadix(1);
 
   @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
-    bundle.putFloat(keyForField(FIELD_SPEED), speed);
-    bundle.putFloat(keyForField(FIELD_PITCH), pitch);
+    bundle.putFloat(FIELD_SPEED, speed);
+    bundle.putFloat(FIELD_PITCH, pitch);
     return bundle;
   }
 
   /** Object that can restore {@link PlaybackParameters} from a {@link Bundle}. */
   public static final Creator<PlaybackParameters> CREATOR =
       bundle -> {
-        float speed = bundle.getFloat(keyForField(FIELD_SPEED), /* defaultValue= */ 1f);
-        float pitch = bundle.getFloat(keyForField(FIELD_PITCH), /* defaultValue= */ 1f);
+        float speed = bundle.getFloat(FIELD_SPEED, /* defaultValue= */ 1f);
+        float pitch = bundle.getFloat(FIELD_PITCH, /* defaultValue= */ 1f);
         return new PlaybackParameters(speed, pitch);
       };
-
-  private static String keyForField(@FieldNumber int field) {
-    return Integer.toString(field, Character.MAX_RADIX);
-  }
 }

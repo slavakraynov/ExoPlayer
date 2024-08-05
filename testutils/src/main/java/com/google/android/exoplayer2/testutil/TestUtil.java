@@ -25,7 +25,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.MediaCodec;
 import android.net.Uri;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.database.DatabaseProvider;
 import com.google.android.exoplayer2.database.DefaultDatabaseProvider;
 import com.google.android.exoplayer2.extractor.DefaultExtractorInput;
@@ -35,17 +37,31 @@ import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.metadata.MetadataInputBuffer;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
+import com.google.common.truth.Correspondence;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 /** Utility methods for tests. */
 public class TestUtil {
@@ -108,12 +124,35 @@ public class TestUtil {
    * @return The equivalent byte array.
    */
   public static byte[] createByteArray(int... bytes) {
-    byte[] byteArray = new byte[bytes.length];
-    for (int i = 0; i < byteArray.length; i++) {
+    byte[] array = new byte[bytes.length];
+    for (int i = 0; i < array.length; i++) {
       Assertions.checkState(0x00 <= bytes[i] && bytes[i] <= 0xFF);
-      byteArray[i] = (byte) bytes[i];
+      array[i] = (byte) bytes[i];
     }
-    return byteArray;
+    return array;
+  }
+
+  /** Gets the underlying data of the {@link ByteBuffer} as a {@code float[]}. */
+  public static float[] createFloatArray(ByteBuffer byteBuffer) {
+    FloatBuffer buffer = byteBuffer.asFloatBuffer();
+    float[] content = new float[buffer.remaining()];
+    buffer.get(content);
+    return content;
+  }
+
+  /** Creates a {@link ByteBuffer} containing the {@code data}. */
+  public static ByteBuffer createByteBuffer(float[] data) {
+    ByteBuffer buffer =
+        ByteBuffer.allocateDirect(data.length * C.BYTES_PER_FLOAT).order(ByteOrder.nativeOrder());
+    buffer.asFloatBuffer().put(data);
+    return buffer;
+  }
+
+  /** Creates a {@link ByteBuffer} containing the {@code data}. */
+  public static ByteBuffer createByteBuffer(short[] data) {
+    ByteBuffer buffer = ByteBuffer.allocateDirect(data.length * 2).order(ByteOrder.nativeOrder());
+    buffer.asShortBuffer().put(data);
+    return buffer;
   }
 
   /**
@@ -151,6 +190,12 @@ public class TestUtil {
     return Util.toByteArray(getInputStream(context, fileName));
   }
 
+  /** Returns the bytes of a file using its file path. */
+  public static byte[] getByteArrayFromFilePath(String filePath) throws IOException {
+    InputStream inputStream = new FileInputStream(filePath);
+    return Util.toByteArray(inputStream);
+  }
+
   /** Returns an {@link InputStream} for reading from an asset file. */
   public static InputStream getInputStream(Context context, String fileName) throws IOException {
     return context.getResources().getAssets().open(fileName);
@@ -184,6 +229,37 @@ public class TestUtil {
   }
 
   /**
+   * Asserts that the actual timelines are the same to the expected timelines. This assert differs
+   * from testing equality by not comparing:
+   *
+   * <ul>
+   *   <li>Period IDs, which may be different due to ID mapping of child source period IDs.
+   *   <li>Shuffle order, which by default is random and non-deterministic.
+   * </ul>
+   *
+   * @param actualTimelines A list of actual {@link Timeline timelines}.
+   * @param expectedTimelines A list of expected {@link Timeline timelines}.
+   */
+  public static void assertTimelinesSame(
+      List<Timeline> actualTimelines, List<Timeline> expectedTimelines) {
+    assertThat(actualTimelines)
+        .comparingElementsUsing(
+            Correspondence.from(
+                TestUtil::timelinesAreSame, "is equal to (ignoring Window.uid and Period.uid)"))
+        .containsExactlyElementsIn(expectedTimelines)
+        .inOrder();
+  }
+
+  /**
+   * Returns true if {@code thisTimeline} is equal to {@code thatTimeline}, ignoring {@link
+   * Timeline.Window#uid} and {@link Timeline.Period#uid} values, and shuffle order.
+   */
+  public static boolean timelinesAreSame(Timeline thisTimeline, Timeline thatTimeline) {
+    return new NoUidOrShufflingTimeline(thisTimeline)
+        .equals(new NoUidOrShufflingTimeline(thatTimeline));
+  }
+
+  /**
    * Asserts that data read from a {@link DataSource} matches {@code expected}.
    *
    * @param dataSource The {@link DataSource} through which to read.
@@ -199,7 +275,7 @@ public class TestUtil {
     try {
       long length = dataSource.open(dataSpec);
       assertThat(length).isEqualTo(expectKnownLength ? expectedData.length : C.LENGTH_UNSET);
-      byte[] readData = Util.readToEnd(dataSource);
+      byte[] readData = DataSourceUtil.readToEnd(dataSource);
       assertThat(readData).isEqualTo(expectedData);
     } finally {
       dataSource.close();
@@ -306,7 +382,7 @@ public class TestUtil {
           }
         }
       } finally {
-        Util.closeQuietly(dataSource);
+        DataSourceUtil.closeQuietly(dataSource);
       }
 
       if (readResult == Extractor.RESULT_SEEK) {
@@ -324,7 +400,7 @@ public class TestUtil {
   /**
    * Extracts all samples from the given file into a {@link FakeTrackOutput}.
    *
-   * @param extractor The {@link Extractor} to extractor from input.
+   * @param extractor The {@link Extractor} to be used.
    * @param context A {@link Context}.
    * @param fileName The name of the input file.
    * @return The {@link FakeTrackOutput} containing the extracted samples.
@@ -334,6 +410,26 @@ public class TestUtil {
   public static FakeExtractorOutput extractAllSamplesFromFile(
       Extractor extractor, Context context, String fileName) throws IOException {
     byte[] data = TestUtil.getByteArray(context, fileName);
+    return extractAllSamplesFromByteArray(extractor, data);
+  }
+
+  /**
+   * Extracts all samples from the given file into a {@link FakeTrackOutput}.
+   *
+   * @param extractor The {@link Extractor} to be used.
+   * @param filePath The file path.
+   * @return The {@link FakeTrackOutput} containing the extracted samples.
+   * @throws IOException If an error occurred reading from the input, or if the extractor finishes
+   *     reading from input without extracting any {@link SeekMap}.
+   */
+  public static FakeExtractorOutput extractAllSamplesFromFilePath(
+      Extractor extractor, String filePath) throws IOException {
+    byte[] data = getByteArrayFromFilePath(filePath);
+    return extractAllSamplesFromByteArray(extractor, data);
+  }
+
+  private static FakeExtractorOutput extractAllSamplesFromByteArray(
+      Extractor extractor, byte[] data) throws IOException {
     FakeExtractorOutput expectedOutput = new FakeExtractorOutput();
     extractor.init(expectedOutput);
     FakeExtractorInput input = new FakeExtractorInput.Builder().setData(data).build();
@@ -382,7 +478,7 @@ public class TestUtil {
     extractor.seek(initialSeekLoadPosition, seekTimeUs);
 
     PositionHolder positionHolder = new PositionHolder();
-    positionHolder.position = C.POSITION_UNSET;
+    positionHolder.position = C.INDEX_UNSET;
     ExtractorInput extractorInput =
         TestUtil.getExtractorInputFromPosition(dataSource, initialSeekLoadPosition, uri);
     int extractorReadResult = Extractor.RESULT_CONTINUE;
@@ -394,7 +490,7 @@ public class TestUtil {
           extractorReadResult = extractor.read(extractorInput, positionHolder);
         }
       } finally {
-        Util.closeQuietly(dataSource);
+        DataSourceUtil.closeQuietly(dataSource);
       }
 
       if (extractorReadResult == Extractor.RESULT_SEEK) {
@@ -433,4 +529,98 @@ public class TestUtil {
     return buffer;
   }
 
+  /** Returns all the public methods of a Java class (except those defined by {@link Object}). */
+  public static List<Method> getPublicMethods(Class<?> clazz) {
+    // Run a BFS over all extended types to inspect them all.
+    Queue<Class<?>> supertypeQueue = new ArrayDeque<>();
+    supertypeQueue.add(clazz);
+    Set<Class<?>> supertypes = new HashSet<>();
+    Object object = new Object();
+    while (!supertypeQueue.isEmpty()) {
+      Class<?> currentSupertype = supertypeQueue.remove();
+      if (supertypes.add(currentSupertype)) {
+        @Nullable Class<?> superclass = currentSupertype.getSuperclass();
+        if (superclass != null && !superclass.isInstance(object)) {
+          supertypeQueue.add(superclass);
+        }
+
+        Collections.addAll(supertypeQueue, currentSupertype.getInterfaces());
+      }
+    }
+
+    List<Method> list = new ArrayList<>();
+    for (Class<?> supertype : supertypes) {
+      for (Method method : supertype.getDeclaredMethods()) {
+        if (Modifier.isPublic(method.getModifiers())) {
+          list.add(method);
+        }
+      }
+    }
+
+    return list;
+  }
+
+  private static final class NoUidOrShufflingTimeline extends Timeline {
+
+    private final Timeline delegate;
+
+    public NoUidOrShufflingTimeline(Timeline timeline) {
+      this.delegate = timeline;
+    }
+
+    @Override
+    public int getWindowCount() {
+      return delegate.getWindowCount();
+    }
+
+    @Override
+    public int getNextWindowIndex(int windowIndex, int repeatMode, boolean shuffleModeEnabled) {
+      return delegate.getNextWindowIndex(windowIndex, repeatMode, /* shuffleModeEnabled= */ false);
+    }
+
+    @Override
+    public int getPreviousWindowIndex(int windowIndex, int repeatMode, boolean shuffleModeEnabled) {
+      return delegate.getPreviousWindowIndex(
+          windowIndex, repeatMode, /* shuffleModeEnabled= */ false);
+    }
+
+    @Override
+    public int getLastWindowIndex(boolean shuffleModeEnabled) {
+      return delegate.getLastWindowIndex(/* shuffleModeEnabled= */ false);
+    }
+
+    @Override
+    public int getFirstWindowIndex(boolean shuffleModeEnabled) {
+      return delegate.getFirstWindowIndex(/* shuffleModeEnabled= */ false);
+    }
+
+    @Override
+    public Window getWindow(int windowIndex, Window window, long defaultPositionProjectionUs) {
+      delegate.getWindow(windowIndex, window, defaultPositionProjectionUs);
+      window.uid = 0;
+      return window;
+    }
+
+    @Override
+    public int getPeriodCount() {
+      return delegate.getPeriodCount();
+    }
+
+    @Override
+    public Period getPeriod(int periodIndex, Period period, boolean setIds) {
+      delegate.getPeriod(periodIndex, period, setIds);
+      period.uid = 0;
+      return period;
+    }
+
+    @Override
+    public int getIndexOfPeriod(Object uid) {
+      return delegate.getIndexOfPeriod(uid);
+    }
+
+    @Override
+    public Object getUidOfPeriod(int periodIndex) {
+      return 0;
+    }
+  }
 }

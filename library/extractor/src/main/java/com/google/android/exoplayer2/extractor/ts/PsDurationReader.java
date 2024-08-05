@@ -21,6 +21,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.Util;
@@ -38,8 +39,16 @@ import java.io.IOException;
  * the same thread.
  *
  * <p>Note: See ISO/IEC 13818-1, Table 2-33 for details of the SCR field in pack_header.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class PsDurationReader {
+
+  private static final String TAG = "PsDurationReader";
 
   private static final int TIMESTAMP_SEARCH_BYTES = 20_000;
 
@@ -102,6 +111,10 @@ import java.io.IOException;
     long minScrPositionUs = scrTimestampAdjuster.adjustTsTimestamp(firstScrValue);
     long maxScrPositionUs = scrTimestampAdjuster.adjustTsTimestamp(lastScrValue);
     durationUs = maxScrPositionUs - minScrPositionUs;
+    if (durationUs < 0) {
+      Log.w(TAG, "Invalid duration: " + durationUs + ". Using TIME_UNSET instead.");
+      durationUs = C.TIME_UNSET;
+    }
     return finishReadDuration(input);
   }
 

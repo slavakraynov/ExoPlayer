@@ -26,7 +26,13 @@ import com.google.android.exoplayer2.video.AvcConfig;
 
 /**
  * Parses video tags from an FLV stream and extracts H.264 nal units.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class VideoTagPayloadReader extends TagPayloadReader {
 
   // Video codec.
@@ -96,7 +102,7 @@ import com.google.android.exoplayer2.video.AvcConfig;
               .setCodecs(avcConfig.codecs)
               .setWidth(avcConfig.width)
               .setHeight(avcConfig.height)
-              .setPixelWidthHeightRatio(avcConfig.pixelWidthAspectRatio)
+              .setPixelWidthHeightRatio(avcConfig.pixelWidthHeightRatio)
               .setInitializationData(avcConfig.initializationData)
               .build();
       output.format(format);
@@ -143,5 +149,4 @@ import com.google.android.exoplayer2.video.AvcConfig;
       return false;
     }
   }
-
 }

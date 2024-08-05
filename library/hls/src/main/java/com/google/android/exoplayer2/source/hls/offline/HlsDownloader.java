@@ -19,9 +19,8 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.offline.SegmentDownloader;
-import com.google.android.exoplayer2.offline.StreamKey;
-import com.google.android.exoplayer2.source.hls.playlist.HlsMasterPlaylist;
 import com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist;
+import com.google.android.exoplayer2.source.hls.playlist.HlsMultivariantPlaylist;
 import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylist;
 import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylistParser;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -45,15 +44,15 @@ import java.util.concurrent.Executor;
  * CacheDataSource.Factory cacheDataSourceFactory =
  *     new CacheDataSource.Factory()
  *         .setCache(cache)
- *         .setUpstreamDataSourceFactory(new DefaultHttpDataSourceFactory(userAgent));
- * // Create a downloader for the first variant in a master playlist.
+ *         .setUpstreamDataSourceFactory(new DefaultHttpDataSource.Factory());
+ * // Create a downloader for the first variant in a multivariant playlist.
  * HlsDownloader hlsDownloader =
  *     new HlsDownloader(
  *         new MediaItem.Builder()
  *             .setUri(playlistUri)
  *             .setStreamKeys(
  *                 Collections.singletonList(
- *                     new StreamKey(HlsMasterPlaylist.GROUP_INDEX_VARIANT, 0)))
+ *                     new StreamKey(HlsMultivariantPlaylist.GROUP_INDEX_VARIANT, 0)))
  *             .build(),
  *         Collections.singletonList();
  * // Perform the download.
@@ -62,16 +61,14 @@ import java.util.concurrent.Executor;
  * HlsMediaSource mediaSource =
  *     new HlsMediaSource.Factory(cacheDataSourceFactory).createMediaSource(mediaItem);
  * }</pre>
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class HlsDownloader extends SegmentDownloader<HlsPlaylist> {
-
-  /** @deprecated Use {@link #HlsDownloader(MediaItem, CacheDataSource.Factory)} instead. */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public HlsDownloader(
-      Uri playlistUri, List<StreamKey> streamKeys, CacheDataSource.Factory cacheDataSourceFactory) {
-    this(playlistUri, streamKeys, cacheDataSourceFactory, Runnable::run);
-  }
 
   /**
    * Creates a new instance.
@@ -82,21 +79,6 @@ public final class HlsDownloader extends SegmentDownloader<HlsPlaylist> {
    */
   public HlsDownloader(MediaItem mediaItem, CacheDataSource.Factory cacheDataSourceFactory) {
     this(mediaItem, cacheDataSourceFactory, Runnable::run);
-  }
-
-  /**
-   * @deprecated Use {@link #HlsDownloader(MediaItem, CacheDataSource.Factory, Executor)} instead.
-   */
-  @Deprecated
-  public HlsDownloader(
-      Uri playlistUri,
-      List<StreamKey> streamKeys,
-      CacheDataSource.Factory cacheDataSourceFactory,
-      Executor executor) {
-    this(
-        new MediaItem.Builder().setUri(playlistUri).setStreamKeys(streamKeys).build(),
-        cacheDataSourceFactory,
-        executor);
   }
 
   /**
@@ -111,7 +93,30 @@ public final class HlsDownloader extends SegmentDownloader<HlsPlaylist> {
    */
   public HlsDownloader(
       MediaItem mediaItem, CacheDataSource.Factory cacheDataSourceFactory, Executor executor) {
-    this(mediaItem, new HlsPlaylistParser(), cacheDataSourceFactory, executor);
+    this(
+        mediaItem,
+        new HlsPlaylistParser(),
+        cacheDataSourceFactory,
+        executor,
+        DEFAULT_MAX_MERGED_SEGMENT_START_TIME_DIFF_MS);
+  }
+
+  /**
+   * @deprecated Use {@link HlsDownloader#HlsDownloader(MediaItem, Parser, CacheDataSource.Factory,
+   *     Executor, long)} instead.
+   */
+  @Deprecated
+  public HlsDownloader(
+      MediaItem mediaItem,
+      Parser<HlsPlaylist> manifestParser,
+      CacheDataSource.Factory cacheDataSourceFactory,
+      Executor executor) {
+    this(
+        mediaItem,
+        manifestParser,
+        cacheDataSourceFactory,
+        executor,
+        DEFAULT_MAX_MERGED_SEGMENT_START_TIME_DIFF_MS);
   }
 
   /**
@@ -124,25 +129,34 @@ public final class HlsDownloader extends SegmentDownloader<HlsPlaylist> {
    * @param executor An {@link Executor} used to make requests for the media being downloaded.
    *     Providing an {@link Executor} that uses multiple threads will speed up the download by
    *     allowing parts of it to be executed in parallel.
+   * @param maxMergedSegmentStartTimeDiffMs The maximum difference of the start time of two
+   *     segments, up to which the segments (of the same URI) should be merged into a single
+   *     download segment, in milliseconds.
    */
   public HlsDownloader(
       MediaItem mediaItem,
       Parser<HlsPlaylist> manifestParser,
       CacheDataSource.Factory cacheDataSourceFactory,
-      Executor executor) {
-    super(mediaItem, manifestParser, cacheDataSourceFactory, executor);
+      Executor executor,
+      long maxMergedSegmentStartTimeDiffMs) {
+    super(
+        mediaItem,
+        manifestParser,
+        cacheDataSourceFactory,
+        executor,
+        maxMergedSegmentStartTimeDiffMs);
   }
 
   @Override
-  protected List<Segment> getSegments(DataSource dataSource, HlsPlaylist playlist, boolean removing)
+  protected List<Segment> getSegments(DataSource dataSource, HlsPlaylist manifest, boolean removing)
       throws IOException, InterruptedException {
     ArrayList<DataSpec> mediaPlaylistDataSpecs = new ArrayList<>();
-    if (playlist instanceof HlsMasterPlaylist) {
-      HlsMasterPlaylist masterPlaylist = (HlsMasterPlaylist) playlist;
-      addMediaPlaylistDataSpecs(masterPlaylist.mediaPlaylistUrls, mediaPlaylistDataSpecs);
+    if (manifest instanceof HlsMultivariantPlaylist) {
+      HlsMultivariantPlaylist multivariantPlaylist = (HlsMultivariantPlaylist) manifest;
+      addMediaPlaylistDataSpecs(multivariantPlaylist.mediaPlaylistUrls, mediaPlaylistDataSpecs);
     } else {
       mediaPlaylistDataSpecs.add(
-          SegmentDownloader.getCompressibleDataSpec(Uri.parse(playlist.baseUri)));
+          SegmentDownloader.getCompressibleDataSpec(Uri.parse(manifest.baseUri)));
     }
 
     ArrayList<Segment> segments = new ArrayList<>();

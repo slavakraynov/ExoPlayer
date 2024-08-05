@@ -29,7 +29,15 @@ import com.google.android.exoplayer2.util.TimestampAdjuster;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Parses PES packet data and extracts samples. */
+/**
+ * Parses PES packet data and extracts samples.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class PesReader implements TsPayloadReader {
 
   private static final String TAG = "PesReader";
@@ -65,7 +73,9 @@ public final class PesReader implements TsPayloadReader {
   }
 
   @Override
-  public void init(TimestampAdjuster timestampAdjuster, ExtractorOutput extractorOutput,
+  public void init(
+      TimestampAdjuster timestampAdjuster,
+      ExtractorOutput extractorOutput,
       TrackIdGenerator idGenerator) {
     this.timestampAdjuster = timestampAdjuster;
     reader.createTracks(extractorOutput, idGenerator);
@@ -208,8 +218,11 @@ public final class PesReader implements TsPayloadReader {
     if (packetLength == 0) {
       payloadSize = C.LENGTH_UNSET;
     } else {
-      payloadSize = packetLength + 6 /* packetLength does not include the first 6 bytes */
-          - HEADER_SIZE - extendedHeaderLength;
+      payloadSize =
+          packetLength
+              + 6 /* packetLength does not include the first 6 bytes */
+              - HEADER_SIZE
+              - extendedHeaderLength;
       if (payloadSize < 0) {
         Log.w(TAG, "Found negative packet payload size: " + payloadSize);
         payloadSize = C.LENGTH_UNSET;
@@ -249,5 +262,4 @@ public final class PesReader implements TsPayloadReader {
       timeUs = timestampAdjuster.adjustTsTimestamp(pts);
     }
   }
-
 }

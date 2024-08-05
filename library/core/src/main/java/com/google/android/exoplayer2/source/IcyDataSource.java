@@ -34,7 +34,13 @@ import java.util.Map;
  *
  * <p>Note: {@link #open(DataSpec)} and {@link #close()} are not supported. This implementation is
  * intended to wrap upstream {@link DataSource} instances that are opened and closed directly.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class IcyDataSource implements DataSource {
 
   public interface Listener {
@@ -79,7 +85,7 @@ import java.util.Map;
   }
 
   @Override
-  public int read(byte[] buffer, int offset, int readLength) throws IOException {
+  public int read(byte[] buffer, int offset, int length) throws IOException {
     if (bytesUntilMetadata == 0) {
       if (readMetadata()) {
         bytesUntilMetadata = metadataIntervalBytes;
@@ -87,7 +93,7 @@ import java.util.Map;
         return C.RESULT_END_OF_INPUT;
       }
     }
-    int bytesRead = upstream.read(buffer, offset, min(bytesUntilMetadata, readLength));
+    int bytesRead = upstream.read(buffer, offset, min(bytesUntilMetadata, length));
     if (bytesRead != C.RESULT_END_OF_INPUT) {
       bytesUntilMetadata -= bytesRead;
     }

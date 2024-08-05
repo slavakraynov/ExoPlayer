@@ -41,27 +41,24 @@ public class AsynchronousMediaCodecAdapterTest {
 
   @Before
   public void setUp() throws Exception {
-    MediaCodecInfo codecInfo = createMediaCodecInfo("h264", "video/mp4");
+    MediaCodecInfo codecInfo = createMediaCodecInfo("aac", "audio/aac");
     MediaCodecAdapter.Configuration configuration =
-        new MediaCodecAdapter.Configuration(
+        MediaCodecAdapter.Configuration.createForAudioDecoding(
             codecInfo,
             createMediaFormat("format"),
-            /* format= */ new Format.Builder().build(),
-            /* surface= */ null,
-            /* crypto= */ null,
-            /* flags= */ 0);
+            new Format.Builder().build(),
+            /* crypto= */ null);
     callbackThread = new HandlerThread("TestCallbackThread");
     queueingThread = new HandlerThread("TestQueueingThread");
     adapter =
         new AsynchronousMediaCodecAdapter.Factory(
                 /* callbackThreadSupplier= */ () -> callbackThread,
                 /* queueingThreadSupplier= */ () -> queueingThread,
-                /* forceQueueingSynchronizationWorkaround= */ false,
                 /* synchronizeCodecInteractionsWithQueueing= */ false)
             .createAdapter(configuration);
     bufferInfo = new MediaCodec.BufferInfo();
-    // After start(), the ShadowMediaCodec offers input buffer 0. We advance the looper to make sure
-    // and messages have been propagated to the adapter.
+    // After starting the MediaCodec, the ShadowMediaCodec offers input buffer 0. We advance the
+    // looper to make sure any messages have been propagated to the adapter.
     shadowOf(callbackThread.getLooper()).idle();
   }
 
@@ -75,11 +72,24 @@ public class AsynchronousMediaCodecAdapterTest {
     assertThat(adapter.dequeueInputBufferIndex()).isEqualTo(0);
   }
 
-
   @Test
   public void dequeueInputBufferIndex_withMediaCodecError_throwsException() throws Exception {
     // Set an error directly on the adapter (not through the looper).
     adapter.onError(createCodecException());
+
+    assertThrows(IllegalStateException.class, () -> adapter.dequeueInputBufferIndex());
+  }
+
+  @Test
+  public void dequeueInputBufferIndex_withPendingQueueingError_throwsException() {
+    // Force MediaCodec to throw an error by attempting to queue input buffer -1.
+    adapter.queueInputBuffer(
+        /* index= */ -1,
+        /* offset= */ 0,
+        /* size= */ 0,
+        /* presentationTimeUs= */ 0,
+        /* flags= */ 0);
+    shadowOf(queueingThread.getLooper()).idle();
 
     assertThrows(IllegalStateException.class, () -> adapter.dequeueInputBufferIndex());
   }
@@ -123,6 +133,20 @@ public class AsynchronousMediaCodecAdapterTest {
   public void dequeueOutputBufferIndex_withMediaCodecError_throwsException() throws Exception {
     // Set an error directly on the adapter.
     adapter.onError(createCodecException());
+
+    assertThrows(IllegalStateException.class, () -> adapter.dequeueOutputBufferIndex(bufferInfo));
+  }
+
+  @Test
+  public void dequeueOutputBufferIndex_withPendingQueueingError_throwsException() {
+    // Force MediaCodec to throw an error by attempting to queue input buffer -1.
+    adapter.queueInputBuffer(
+        /* index= */ -1,
+        /* offset= */ 0,
+        /* size= */ 0,
+        /* presentationTimeUs= */ 0,
+        /* flags= */ 0);
+    shadowOf(queueingThread.getLooper()).idle();
 
     assertThrows(IllegalStateException.class, () -> adapter.dequeueOutputBufferIndex(bufferInfo));
   }
@@ -196,6 +220,7 @@ public class AsynchronousMediaCodecAdapterTest {
     Constructor<MediaCodec.CodecException> constructor =
         MediaCodec.CodecException.class.getDeclaredConstructor(
             Integer.TYPE, Integer.TYPE, String.class);
+    constructor.setAccessible(true);
     return constructor.newInstance(
         /* errorCode= */ 0, /* actionCode= */ 0, /* detailMessage= */ "error from codec");
   }

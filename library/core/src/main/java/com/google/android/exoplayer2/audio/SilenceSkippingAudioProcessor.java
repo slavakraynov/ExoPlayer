@@ -16,20 +16,29 @@
 package com.google.android.exoplayer2.audio;
 
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 
 /**
  * An {@link AudioProcessor} that skips silence in the input stream. Input and output are 16-bit
  * PCM.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class SilenceSkippingAudioProcessor extends BaseAudioProcessor {
 
   /**
@@ -51,6 +60,7 @@ public final class SilenceSkippingAudioProcessor extends BaseAudioProcessor {
   /** Trimming states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     STATE_NOISY,
     STATE_MAYBE_SILENT,
@@ -83,7 +93,7 @@ public final class SilenceSkippingAudioProcessor extends BaseAudioProcessor {
    */
   private byte[] paddingBuffer;
 
-  @State private int state;
+  private @State int state;
   private int maybeSilenceBufferSize;
   private int paddingSize;
   private boolean hasOutputNoise;
@@ -140,6 +150,7 @@ public final class SilenceSkippingAudioProcessor extends BaseAudioProcessor {
   // AudioProcessor implementation.
 
   @Override
+  @CanIgnoreReturnValue
   public AudioFormat onConfigure(AudioFormat inputAudioFormat)
       throws UnhandledAudioFormatException {
     if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {

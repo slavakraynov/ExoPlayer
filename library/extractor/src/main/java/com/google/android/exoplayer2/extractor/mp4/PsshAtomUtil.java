@@ -21,7 +21,15 @@ import com.google.android.exoplayer2.util.ParsableByteArray;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-/** Utility methods for handling PSSH atoms. */
+/**
+ * Utility methods for handling PSSH atoms.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class PsshAtomUtil {
 
   private static final String TAG = "PsshAtomUtil";
@@ -104,8 +112,8 @@ public final class PsshAtomUtil {
 
   /**
    * Parses the version from a PSSH atom. Version 0 and 1 PSSH atoms are supported.
-   * <p>
-   * The version is only parsed if the data is a valid PSSH atom.
+   *
+   * <p>The version is only parsed if the data is a valid PSSH atom.
    *
    * @param atom The atom to parse.
    * @return The parsed version. -1 if the input is not a valid PSSH atom, or if the PSSH atom has
@@ -201,7 +209,5 @@ public final class PsshAtomUtil {
       this.version = version;
       this.schemeData = schemeData;
     }
-
   }
-
 }

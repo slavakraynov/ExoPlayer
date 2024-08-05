@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.audio;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import android.annotation.TargetApi;
 import android.media.AudioTimestamp;
 import android.media.AudioTrack;
@@ -26,6 +28,7 @@ import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Polls the {@link AudioTrack} timestamp, if the platform supports it, taking care of polling at
@@ -43,12 +46,19 @@ import java.lang.annotation.RetentionPolicy;
  * time since it was sampled. Otherwise, it may be stationary.
  *
  * <p>Call {@link #reset()} when pausing or resuming the track.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class AudioTimestampPoller {
 
   /** Timestamp polling states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     STATE_INITIALIZING,
     STATE_TIMESTAMP,
@@ -233,7 +243,7 @@ import java.lang.annotation.RetentionPolicy;
    */
   @TargetApi(19) // audioTimestamp will be null if Util.SDK_INT < 19.
   public long getTimestampPositionFrames() {
-    return audioTimestamp != null ? audioTimestamp.getTimestampPositionFrames() : C.POSITION_UNSET;
+    return audioTimestamp != null ? audioTimestamp.getTimestampPositionFrames() : C.INDEX_UNSET;
   }
 
   private void updateState(@State int state) {
@@ -242,7 +252,7 @@ import java.lang.annotation.RetentionPolicy;
       case STATE_INITIALIZING:
         // Force polling a timestamp immediately, and poll quickly.
         lastTimestampSampleTimeUs = 0;
-        initialTimestampPositionFrames = C.POSITION_UNSET;
+        initialTimestampPositionFrames = C.INDEX_UNSET;
         initializeSystemTimeUs = System.nanoTime() / 1000;
         sampleIntervalUs = FAST_POLL_INTERVAL_US;
         break;

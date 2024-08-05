@@ -28,7 +28,15 @@ import com.google.android.exoplayer2.util.Util;
 import java.util.Arrays;
 import java.util.List;
 
-/** An abstract base class suitable for most {@link ExoTrackSelection} implementations. */
+/**
+ * An abstract base class suitable for most {@link ExoTrackSelection} implementations.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public abstract class BaseTrackSelection implements ExoTrackSelection {
 
   /** The selected {@link TrackGroup}. */
@@ -39,7 +47,7 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
   protected final int[] tracks;
 
   /** The type of the selection. */
-  private final int type;
+  private final @Type int type;
   /** The {@link Format}s of the selected tracks, in order of decreasing bandwidth. */
   private final Format[] formats;
   /** Selected track exclusion timestamps, in order of decreasing bandwidth. */
@@ -63,7 +71,7 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
    *     null or empty. May be in any order.
    * @param type The type that will be returned from {@link TrackSelection#getType()}.
    */
-  public BaseTrackSelection(TrackGroup group, int[] tracks, int type) {
+  public BaseTrackSelection(TrackGroup group, int[] tracks, @Type int type) {
     Assertions.checkState(tracks.length > 0);
     this.type = type;
     this.group = Assertions.checkNotNull(group);
@@ -164,11 +172,11 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
   }
 
   @Override
-  public boolean blacklist(int index, long exclusionDurationMs) {
+  public boolean excludeTrack(int index, long exclusionDurationMs) {
     long nowMs = SystemClock.elapsedRealtime();
-    boolean canExclude = isBlacklisted(index, nowMs);
+    boolean canExclude = isTrackExcluded(index, nowMs);
     for (int i = 0; i < length && !canExclude; i++) {
-      canExclude = i != index && !isBlacklisted(i, nowMs);
+      canExclude = i != index && !isTrackExcluded(i, nowMs);
     }
     if (!canExclude) {
       return false;
@@ -181,7 +189,7 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
   }
 
   @Override
-  public boolean isBlacklisted(int index, long nowMs) {
+  public boolean isTrackExcluded(int index, long nowMs) {
     return excludeUntilTimes[index] > nowMs;
   }
 

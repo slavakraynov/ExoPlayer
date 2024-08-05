@@ -26,18 +26,29 @@ import android.net.Uri;
 import android.util.Pair;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.source.mediaparser.InputReaderAdapterV30;
+import com.google.android.exoplayer2.source.mediaparser.MediaParserUtil;
 import com.google.android.exoplayer2.source.mediaparser.OutputConsumerAdapterV30;
 import com.google.android.exoplayer2.upstream.DataReader;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** {@link ProgressiveMediaExtractor} implemented on top of the platform's {@link MediaParser}. */
+/**
+ * {@link ProgressiveMediaExtractor} implemented on top of the platform's {@link MediaParser}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
 @RequiresApi(30)
+@Deprecated
 public final class MediaParserExtractorAdapter implements ProgressiveMediaExtractor {
 
   /**
@@ -52,7 +63,7 @@ public final class MediaParserExtractorAdapter implements ProgressiveMediaExtrac
   private String parserName;
 
   @SuppressLint("WrongConstant")
-  public MediaParserExtractorAdapter() {
+  public MediaParserExtractorAdapter(PlayerId playerId) {
     // TODO: Add support for injecting the desired extractor list.
     outputConsumerAdapter = new OutputConsumerAdapterV30();
     inputReaderAdapter = new InputReaderAdapterV30();
@@ -61,6 +72,9 @@ public final class MediaParserExtractorAdapter implements ProgressiveMediaExtrac
     mediaParser.setParameter(PARAMETER_IN_BAND_CRYPTO_INFO, true);
     mediaParser.setParameter(PARAMETER_INCLUDE_SUPPLEMENTAL_DATA, true);
     parserName = MediaParser.PARSER_NAME_UNKNOWN;
+    if (Util.SDK_INT >= 31) {
+      MediaParserUtil.setLogSessionIdOnMediaParser(mediaParser, playerId);
+    }
   }
 
   @Override
@@ -120,7 +134,7 @@ public final class MediaParserExtractorAdapter implements ProgressiveMediaExtrac
     positionHolder.position = inputReaderAdapter.getAndResetSeekPosition();
     return !shouldContinue
         ? Extractor.RESULT_END_OF_INPUT
-        : positionHolder.position != C.POSITION_UNSET
+        : positionHolder.position != C.INDEX_UNSET
             ? Extractor.RESULT_SEEK
             : Extractor.RESULT_CONTINUE;
   }

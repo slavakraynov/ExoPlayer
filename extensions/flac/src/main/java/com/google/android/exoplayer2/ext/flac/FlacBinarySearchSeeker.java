@@ -22,7 +22,6 @@ import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.FlacStreamMetadata;
 import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.util.Assertions;
-import com.google.android.exoplayer2.util.FlacConstants;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -31,7 +30,13 @@ import java.nio.ByteBuffer;
  *
  * <p>This seeker performs seeking by using binary search within the stream, until it finds the
  * frame that contains the target sample.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class FlacBinarySearchSeeker extends BinarySearchSeeker {
 
   /**
@@ -49,6 +54,8 @@ import java.nio.ByteBuffer;
       this.byteBuffer = outputByteBuffer;
     }
   }
+
+  private static final int MIN_FRAME_HEADER_SIZE = 6;
 
   private final FlacDecoderJni decoderJni;
 
@@ -76,8 +83,7 @@ import java.nio.ByteBuffer;
         /* floorBytePosition= */ firstFramePosition,
         /* ceilingBytePosition= */ inputLength,
         /* approxBytesPerFrame= */ streamMetadata.getApproxBytesPerFrame(),
-        /* minimumSearchRange= */ max(
-            FlacConstants.MIN_FRAME_HEADER_SIZE, streamMetadata.minFrameSize));
+        /* minimumSearchRange= */ max(MIN_FRAME_HEADER_SIZE, streamMetadata.minFrameSize));
     this.decoderJni = Assertions.checkNotNull(decoderJni);
   }
 

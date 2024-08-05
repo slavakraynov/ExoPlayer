@@ -22,6 +22,7 @@ import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.mp3.Mp3Extractor;
@@ -43,7 +44,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/** Default {@link HlsExtractorFactory} implementation. */
+/**
+ * Default {@link HlsExtractorFactory} implementation.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
 
   // Extractors order is optimized according to
@@ -59,7 +68,7 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
         FileTypes.MP3,
       };
 
-  @DefaultTsPayloadReaderFactory.Flags private final int payloadReaderFactoryFlags;
+  private final @DefaultTsPayloadReaderFactory.Flags int payloadReaderFactoryFlags;
   private final boolean exposeCea608WhenMissingDeclarations;
 
   /**
@@ -78,8 +87,9 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
    *     DefaultTsPayloadReaderFactory} instances. Other flags may be added on top of {@code
    *     payloadReaderFactoryFlags} when creating {@link DefaultTsPayloadReaderFactory}.
    * @param exposeCea608WhenMissingDeclarations Whether created {@link TsExtractor} instances should
-   *     expose a CEA-608 track should the master playlist contain no Closed Captions declarations.
-   *     If the master playlist contains any Closed Captions declarations, this flag is ignored.
+   *     expose a CEA-608 track should the multivariant playlist contain no Closed Captions
+   *     declarations. If the multivariant playlist contains any Closed Captions declarations, this
+   *     flag is ignored.
    */
   public DefaultHlsExtractorFactory(
       int payloadReaderFactoryFlags, boolean exposeCea608WhenMissingDeclarations) {
@@ -94,7 +104,8 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
       @Nullable List<Format> muxedCaptionFormats,
       TimestampAdjuster timestampAdjuster,
       Map<String, List<String>> responseHeaders,
-      ExtractorInput extractorInput)
+      ExtractorInput sniffingExtractorInput,
+      PlayerId playerId)
       throws IOException {
     @FileTypes.Type
     int formatInferredFileType = FileTypes.inferFileTypeFromMimeType(format.sampleMimeType);
@@ -115,13 +126,13 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
 
     // Extractor to be used if the type is not recognized.
     @Nullable Extractor fallBackExtractor = null;
-    extractorInput.resetPeekPosition();
+    sniffingExtractorInput.resetPeekPosition();
     for (int i = 0; i < fileTypeOrder.size(); i++) {
       int fileType = fileTypeOrder.get(i);
       Extractor extractor =
           checkNotNull(
               createExtractorByFileType(fileType, format, muxedCaptionFormats, timestampAdjuster));
-      if (sniffQuietly(extractor, extractorInput)) {
+      if (sniffQuietly(extractor, sniffingExtractorInput)) {
         return new BundledHlsMediaChunkExtractor(extractor, format, timestampAdjuster);
       }
       if (fallBackExtractor == null

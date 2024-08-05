@@ -25,7 +25,15 @@ import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
 
-/** MP3 seeker that uses metadata from a VBRI header. */
+/**
+ * MP3 seeker that uses metadata from a VBRI header.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class VbriSeeker implements Seeker {
 
   private static final String TAG = "VbriSeeker";
@@ -55,8 +63,9 @@ import com.google.android.exoplayer2.util.Util;
       return null;
     }
     int sampleRate = mpegAudioHeader.sampleRate;
-    long durationUs = Util.scaleLargeTimestamp(numFrames,
-        C.MICROS_PER_SECOND * (sampleRate >= 32000 ? 1152 : 576), sampleRate);
+    long durationUs =
+        Util.scaleLargeTimestamp(
+            numFrames, C.MICROS_PER_SECOND * (sampleRate >= 32000 ? 1152 : 576), sampleRate);
     int entryCount = frame.readUnsignedShort();
     int scale = frame.readUnsignedShort();
     int entrySize = frame.readUnsignedShort();
@@ -88,7 +97,7 @@ import com.google.android.exoplayer2.util.Util;
         default:
           return null;
       }
-      position += segmentSize * scale;
+      position += segmentSize * ((long) scale);
     }
     if (inputLength != C.LENGTH_UNSET && inputLength != position) {
       Log.w(TAG, "VBRI data size mismatch: " + inputLength + ", " + position);

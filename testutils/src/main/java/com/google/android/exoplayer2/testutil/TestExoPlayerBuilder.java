@@ -20,20 +20,24 @@ import static com.google.common.truth.Truth.assertThat;
 import android.content.Context;
 import android.os.Looper;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RenderersFactory;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.analytics.AnalyticsCollector;
+import com.google.android.exoplayer2.analytics.DefaultAnalyticsCollector;
+import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Clock;
+import com.google.android.exoplayer2.util.HandlerWrapper;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** A builder of {@link SimpleExoPlayer} instances for testing. */
+/** A builder of {@link ExoPlayer} instances for testing. */
 public class TestExoPlayerBuilder {
 
   private final Context context;
@@ -43,8 +47,12 @@ public class TestExoPlayerBuilder {
   private BandwidthMeter bandwidthMeter;
   @Nullable private Renderer[] renderers;
   @Nullable private RenderersFactory renderersFactory;
+  @Nullable private MediaSource.Factory mediaSourceFactory;
   private boolean useLazyPreparation;
   private @MonotonicNonNull Looper looper;
+  private long seekBackIncrementMs;
+  private long seekForwardIncrementMs;
+  private boolean deviceVolumeControlEnabled;
 
   public TestExoPlayerBuilder(Context context) {
     this.context = context;
@@ -56,6 +64,9 @@ public class TestExoPlayerBuilder {
     if (myLooper != null) {
       looper = myLooper;
     }
+    seekBackIncrementMs = C.DEFAULT_SEEK_BACK_INCREMENT_MS;
+    seekForwardIncrementMs = C.DEFAULT_SEEK_FORWARD_INCREMENT_MS;
+    deviceVolumeControlEnabled = false;
   }
 
   /**
@@ -64,6 +75,7 @@ public class TestExoPlayerBuilder {
    * @param useLazyPreparation Whether to use lazy preparation.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setUseLazyPreparation(boolean useLazyPreparation) {
     this.useLazyPreparation = useLazyPreparation;
     return this;
@@ -81,6 +93,7 @@ public class TestExoPlayerBuilder {
    * @param trackSelector The {@link DefaultTrackSelector} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setTrackSelector(DefaultTrackSelector trackSelector) {
     Assertions.checkNotNull(trackSelector);
     this.trackSelector = trackSelector;
@@ -99,6 +112,7 @@ public class TestExoPlayerBuilder {
    * @param loadControl The {@link LoadControl} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setLoadControl(LoadControl loadControl) {
     this.loadControl = loadControl;
     return this;
@@ -116,6 +130,7 @@ public class TestExoPlayerBuilder {
    * @param bandwidthMeter The {@link BandwidthMeter} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setBandwidthMeter(BandwidthMeter bandwidthMeter) {
     Assertions.checkNotNull(bandwidthMeter);
     this.bandwidthMeter = bandwidthMeter;
@@ -135,6 +150,7 @@ public class TestExoPlayerBuilder {
    * @param renderers A list of {@link Renderer}s to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setRenderers(Renderer... renderers) {
     assertThat(renderersFactory).isNull();
     this.renderers = renderers;
@@ -160,6 +176,7 @@ public class TestExoPlayerBuilder {
    * @param renderersFactory A {@link RenderersFactory} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setRenderersFactory(RenderersFactory renderersFactory) {
     assertThat(renderers).isNull();
     this.renderersFactory = renderersFactory;
@@ -182,6 +199,7 @@ public class TestExoPlayerBuilder {
    * @param clock A {@link Clock} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setClock(Clock clock) {
     assertThat(clock).isNotNull();
     this.clock = clock;
@@ -199,6 +217,7 @@ public class TestExoPlayerBuilder {
    * @param looper The {@link Looper} to be used by the player.
    * @return This builder.
    */
+  @CanIgnoreReturnValue
   public TestExoPlayerBuilder setLooper(Looper looper) {
     this.looper = looper;
     return this;
@@ -214,11 +233,74 @@ public class TestExoPlayerBuilder {
   }
 
   /**
-   * Builds an {@link SimpleExoPlayer} using the provided values or their defaults.
-   *
-   * @return The built {@link ExoPlayerTestRunner}.
+   * Returns the {@link MediaSource.Factory} that will be used by the player, or null if no {@link
+   * MediaSource.Factory} has been set yet and no default is available.
    */
-  public SimpleExoPlayer build() {
+  @Nullable
+  public MediaSource.Factory getMediaSourceFactory() {
+    return mediaSourceFactory;
+  }
+
+  /**
+   * Sets the {@link MediaSource.Factory} to be used by the player.
+   *
+   * @param mediaSourceFactory The {@link MediaSource.Factory} to be used by the player.
+   * @return This builder.
+   */
+  @CanIgnoreReturnValue
+  public TestExoPlayerBuilder setMediaSourceFactory(MediaSource.Factory mediaSourceFactory) {
+    this.mediaSourceFactory = mediaSourceFactory;
+    return this;
+  }
+
+  /**
+   * Sets the seek back increment to be used by the player.
+   *
+   * @param seekBackIncrementMs The seek back increment to be used by the player.
+   * @return This builder.
+   */
+  @CanIgnoreReturnValue
+  public TestExoPlayerBuilder setSeekBackIncrementMs(long seekBackIncrementMs) {
+    this.seekBackIncrementMs = seekBackIncrementMs;
+    return this;
+  }
+
+  /** Returns the seek back increment used by the player. */
+  public long getSeekBackIncrementMs() {
+    return seekBackIncrementMs;
+  }
+
+  /**
+   * Sets the seek forward increment to be used by the player.
+   *
+   * @param seekForwardIncrementMs The seek forward increment to be used by the player.
+   * @return This builder.
+   */
+  @CanIgnoreReturnValue
+  public TestExoPlayerBuilder setSeekForwardIncrementMs(long seekForwardIncrementMs) {
+    this.seekForwardIncrementMs = seekForwardIncrementMs;
+    return this;
+  }
+
+  /**
+   * Sets the variable controlling player's ability to get/set device volume.
+   *
+   * @param deviceVolumeControlEnabled Whether the player can get/set device volume.
+   * @return This builder.
+   */
+  @CanIgnoreReturnValue
+  public TestExoPlayerBuilder setDeviceVolumeControlEnabled(boolean deviceVolumeControlEnabled) {
+    this.deviceVolumeControlEnabled = deviceVolumeControlEnabled;
+    return this;
+  }
+
+  /** Returns the seek forward increment used by the player. */
+  public long getSeekForwardIncrementMs() {
+    return seekForwardIncrementMs;
+  }
+
+  /** Builds an {@link ExoPlayer} using the provided values or their defaults. */
+  public ExoPlayer build() {
     Assertions.checkNotNull(
         looper, "TestExoPlayer builder run on a thread without Looper and no Looper specified.");
     // Do not update renderersFactory and renderers here, otherwise their getters may
@@ -230,23 +312,33 @@ public class TestExoPlayerBuilder {
               videoRendererEventListener,
               audioRendererEventListener,
               textRendererOutput,
-              metadataRendererOutput) ->
-              renderers != null
-                  ? renderers
-                  : new Renderer[] {
-                    new FakeVideoRenderer(eventHandler, videoRendererEventListener),
-                    new FakeAudioRenderer(eventHandler, audioRendererEventListener)
-                  };
+              metadataRendererOutput) -> {
+            HandlerWrapper clockAwareHandler =
+                clock.createHandler(eventHandler.getLooper(), /* callback= */ null);
+            return renderers != null
+                ? renderers
+                : new Renderer[] {
+                  new FakeVideoRenderer(clockAwareHandler, videoRendererEventListener),
+                  new FakeAudioRenderer(clockAwareHandler, audioRendererEventListener)
+                };
+          };
     }
 
-    return new SimpleExoPlayer.Builder(context, playerRenderersFactory)
-        .setTrackSelector(trackSelector)
-        .setLoadControl(loadControl)
-        .setBandwidthMeter(bandwidthMeter)
-        .setAnalyticsCollector(new AnalyticsCollector(clock))
-        .setClock(clock)
-        .setUseLazyPreparation(useLazyPreparation)
-        .setLooper(looper)
-        .build();
+    ExoPlayer.Builder builder =
+        new ExoPlayer.Builder(context, playerRenderersFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            .setBandwidthMeter(bandwidthMeter)
+            .setAnalyticsCollector(new DefaultAnalyticsCollector(clock))
+            .setClock(clock)
+            .setUseLazyPreparation(useLazyPreparation)
+            .setLooper(looper)
+            .setSeekBackIncrementMs(seekBackIncrementMs)
+            .setSeekForwardIncrementMs(seekForwardIncrementMs)
+            .setDeviceVolumeControlEnabled(deviceVolumeControlEnabled);
+    if (mediaSourceFactory != null) {
+      builder.setMediaSourceFactory(mediaSourceFactory);
+    }
+    return builder.build();
   }
 }

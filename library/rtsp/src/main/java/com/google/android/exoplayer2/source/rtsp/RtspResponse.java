@@ -16,11 +16,16 @@
 
 package com.google.android.exoplayer2.source.rtsp;
 
-/** Represents an RTSP Response. */
+/**
+ * Represents an RTSP Response.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class RtspResponse {
-  // TODO(b/172331505) Move this constant to MimeTypes.
-  /** The MIME type associated with Session Description Protocol (RFC4566). */
-  public static final String SDP_MIME_TYPE = "application/sdp";
 
   /** The status code of this response, as defined in RFC 2326 section 11. */
   public final int status;
@@ -40,5 +45,15 @@ package com.google.android.exoplayer2.source.rtsp;
     this.status = status;
     this.headers = headers;
     this.messageBody = messageBody;
+  }
+
+  /**
+   * Creates a new instance with an empty {@link #messageBody}.
+   *
+   * @param status The status code of this response, as defined in RFC 2326 section 11.
+   * @param headers The headers of this response.
+   */
+  public RtspResponse(int status, RtspHeaders headers) {
+    this(status, headers, /* messageBody= */ "");
   }
 }

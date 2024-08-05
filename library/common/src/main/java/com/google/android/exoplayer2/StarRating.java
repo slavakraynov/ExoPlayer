@@ -19,15 +19,20 @@ import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 
 import android.os.Bundle;
 import androidx.annotation.FloatRange;
-import androidx.annotation.IntDef;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.util.Util;
 import com.google.common.base.Objects;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
-/** A rating expressed as a fractional number of stars. */
+/**
+ * A rating expressed as a fractional number of stars.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class StarRating extends Rating {
 
   @IntRange(from = 1)
@@ -100,23 +105,18 @@ public final class StarRating extends Rating {
 
   // Bundleable implementation.
 
-  @RatingType private static final int TYPE = RATING_TYPE_STAR;
+  private static final @RatingType int TYPE = RATING_TYPE_STAR;
   private static final int MAX_STARS_DEFAULT = 5;
 
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef({FIELD_RATING_TYPE, FIELD_MAX_STARS, FIELD_STAR_RATING})
-  private @interface FieldNumber {}
-
-  private static final int FIELD_MAX_STARS = 1;
-  private static final int FIELD_STAR_RATING = 2;
+  private static final String FIELD_MAX_STARS = Util.intToStringMaxRadix(1);
+  private static final String FIELD_STAR_RATING = Util.intToStringMaxRadix(2);
 
   @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
-    bundle.putInt(keyForField(FIELD_RATING_TYPE), TYPE);
-    bundle.putInt(keyForField(FIELD_MAX_STARS), maxStars);
-    bundle.putFloat(keyForField(FIELD_STAR_RATING), starRating);
+    bundle.putInt(FIELD_RATING_TYPE, TYPE);
+    bundle.putInt(FIELD_MAX_STARS, maxStars);
+    bundle.putFloat(FIELD_STAR_RATING, starRating);
     return bundle;
   }
 
@@ -124,19 +124,11 @@ public final class StarRating extends Rating {
   public static final Creator<StarRating> CREATOR = StarRating::fromBundle;
 
   private static StarRating fromBundle(Bundle bundle) {
-    checkArgument(
-        bundle.getInt(keyForField(FIELD_RATING_TYPE), /* defaultValue= */ RATING_TYPE_DEFAULT)
-            == TYPE);
-    int maxStars =
-        bundle.getInt(keyForField(FIELD_MAX_STARS), /* defaultValue= */ MAX_STARS_DEFAULT);
-    float starRating =
-        bundle.getFloat(keyForField(FIELD_STAR_RATING), /* defaultValue= */ RATING_UNSET);
+    checkArgument(bundle.getInt(FIELD_RATING_TYPE, /* defaultValue= */ RATING_TYPE_UNSET) == TYPE);
+    int maxStars = bundle.getInt(FIELD_MAX_STARS, /* defaultValue= */ MAX_STARS_DEFAULT);
+    float starRating = bundle.getFloat(FIELD_STAR_RATING, /* defaultValue= */ RATING_UNSET);
     return starRating == RATING_UNSET
         ? new StarRating(maxStars)
         : new StarRating(maxStars, starRating);
-  }
-
-  private static String keyForField(@FieldNumber int field) {
-    return Integer.toString(field, Character.MAX_RADIX);
   }
 }

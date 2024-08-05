@@ -23,7 +23,13 @@ import java.io.IOException;
 /**
  * Provides methods that peek data from an {@link ExtractorInput} and return whether the input
  * appears to be in MP4 format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class Sniffer {
 
   /** Brand stored in the ftyp atom for QuickTime media. */
@@ -108,8 +114,11 @@ import java.io.IOException;
   private static boolean sniffInternal(ExtractorInput input, boolean fragmented, boolean acceptHeic)
       throws IOException {
     long inputLength = input.getLength();
-    int bytesToSearch = (int) (inputLength == C.LENGTH_UNSET || inputLength > SEARCH_LENGTH
-        ? SEARCH_LENGTH : inputLength);
+    int bytesToSearch =
+        (int)
+            (inputLength == C.LENGTH_UNSET || inputLength > SEARCH_LENGTH
+                ? SEARCH_LENGTH
+                : inputLength);
 
     ParsableByteArray buffer = new ParsableByteArray(64);
     int bytesSearched = 0;
@@ -223,5 +232,4 @@ import java.io.IOException;
   private Sniffer() {
     // Prevent instantiation.
   }
-
 }

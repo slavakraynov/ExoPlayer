@@ -34,26 +34,32 @@ import java.io.IOException;
 /**
  * {@link HlsMediaChunkExtractor} implementation that uses ExoPlayer app-bundled {@link Extractor
  * Extractors}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class BundledHlsMediaChunkExtractor implements HlsMediaChunkExtractor {
 
   private static final PositionHolder POSITION_HOLDER = new PositionHolder();
 
   @VisibleForTesting /* package */ final Extractor extractor;
-  private final Format masterPlaylistFormat;
+  private final Format multivariantPlaylistFormat;
   private final TimestampAdjuster timestampAdjuster;
 
   /**
    * Creates a new instance.
    *
    * @param extractor The underlying {@link Extractor}.
-   * @param masterPlaylistFormat The {@link Format} obtained from the master playlist.
+   * @param multivariantPlaylistFormat The {@link Format} obtained from the multivariant playlist.
    * @param timestampAdjuster A {@link TimestampAdjuster} to adjust sample timestamps.
    */
   public BundledHlsMediaChunkExtractor(
-      Extractor extractor, Format masterPlaylistFormat, TimestampAdjuster timestampAdjuster) {
+      Extractor extractor, Format multivariantPlaylistFormat, TimestampAdjuster timestampAdjuster) {
     this.extractor = extractor;
-    this.masterPlaylistFormat = masterPlaylistFormat;
+    this.multivariantPlaylistFormat = multivariantPlaylistFormat;
     this.timestampAdjuster = timestampAdjuster;
   }
 
@@ -85,7 +91,8 @@ public final class BundledHlsMediaChunkExtractor implements HlsMediaChunkExtract
     Assertions.checkState(!isReusable());
     Extractor newExtractorInstance;
     if (extractor instanceof WebvttExtractor) {
-      newExtractorInstance = new WebvttExtractor(masterPlaylistFormat.language, timestampAdjuster);
+      newExtractorInstance =
+          new WebvttExtractor(multivariantPlaylistFormat.language, timestampAdjuster);
     } else if (extractor instanceof AdtsExtractor) {
       newExtractorInstance = new AdtsExtractor();
     } else if (extractor instanceof Ac3Extractor) {
@@ -99,7 +106,7 @@ public final class BundledHlsMediaChunkExtractor implements HlsMediaChunkExtract
           "Unexpected extractor type for recreation: " + extractor.getClass().getSimpleName());
     }
     return new BundledHlsMediaChunkExtractor(
-        newExtractorInstance, masterPlaylistFormat, timestampAdjuster);
+        newExtractorInstance, multivariantPlaylistFormat, timestampAdjuster);
   }
 
   @Override

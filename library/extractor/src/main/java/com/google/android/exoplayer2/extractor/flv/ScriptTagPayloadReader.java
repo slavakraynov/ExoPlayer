@@ -27,7 +27,13 @@ import java.util.Map;
 
 /**
  * Parses Script Data tags from an FLV stream and extracts metadata information.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class ScriptTagPayloadReader extends TagPayloadReader {
 
   private static final String NAME_METADATA = "onMetaData";
@@ -89,6 +95,10 @@ import java.util.Map;
     String name = readAmfString(data);
     if (!NAME_METADATA.equals(name)) {
       // We're only interested in metadata.
+      return false;
+    }
+    if (data.bytesLeft() == 0) {
+      // The metadata script tag has no value.
       return false;
     }
     int type = readAmfType(data);

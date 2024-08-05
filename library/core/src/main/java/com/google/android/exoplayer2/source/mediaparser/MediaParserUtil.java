@@ -17,13 +17,23 @@ package com.google.android.exoplayer2.source.mediaparser;
 
 import android.media.MediaFormat;
 import android.media.MediaParser;
+import android.media.metrics.LogSessionId;
+import androidx.annotation.DoNotInline;
+import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.analytics.PlayerId;
 
 /**
  * Miscellaneous constants and utility methods related to the {@link MediaParser} integration.
  *
  * <p>For documentation on constants, please see the {@link MediaParser} documentation.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class MediaParserUtil {
 
   public static final String PARAMETER_IN_BAND_CRYPTO_INFO =
@@ -56,5 +66,29 @@ public final class MediaParserUtil {
       mediaFormat.setInteger(MediaFormat.KEY_CAPTION_SERVICE_NUMBER, format.accessibilityChannel);
     }
     return mediaFormat;
+  }
+
+  /**
+   * Calls {@link MediaParser#setLogSessionId(LogSessionId)}.
+   *
+   * @param mediaParser The {@link MediaParser} to call the method on.
+   * @param playerId The {@link PlayerId} to obtain the {@link LogSessionId} from.
+   */
+  @RequiresApi(31)
+  public static void setLogSessionIdOnMediaParser(MediaParser mediaParser, PlayerId playerId) {
+    Api31.setLogSessionIdOnMediaParser(mediaParser, playerId);
+  }
+
+  @RequiresApi(31)
+  private static final class Api31 {
+    private Api31() {}
+
+    @DoNotInline
+    public static void setLogSessionIdOnMediaParser(MediaParser mediaParser, PlayerId playerId) {
+      LogSessionId logSessionId = playerId.getLogSessionId();
+      if (!logSessionId.equals(LogSessionId.LOG_SESSION_ID_NONE)) {
+        mediaParser.setLogSessionId(logSessionId);
+      }
+    }
   }
 }

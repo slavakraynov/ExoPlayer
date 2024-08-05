@@ -33,7 +33,13 @@ import java.util.zip.Inflater;
  * Spherical Video V2 RFC</a>.
  *
  * <p>The decoder does not perform CRC checks at the moment.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class ProjectionDecoder {
 
   private static final int TYPE_YTMP = 0x79746d70;
@@ -58,7 +64,8 @@ import java.util.zip.Inflater;
    * @param stereoMode A {@link C.StereoMode} value.
    * @return The projection or null if the data can't be decoded.
    */
-  public static @Nullable Projection decode(byte[] projectionData, @C.StereoMode int stereoMode) {
+  @Nullable
+  public static Projection decode(byte[] projectionData, @C.StereoMode int stereoMode) {
     ParsableByteArray input = new ParsableByteArray(projectionData);
     // MP4 containers include the proj box but webm containers do not.
     // Both containers use mshp.
@@ -91,7 +98,8 @@ import java.util.zip.Inflater;
     return type == TYPE_PROJ;
   }
 
-  private static @Nullable ArrayList<Mesh> parseProj(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseProj(ParsableByteArray input) {
     input.skipBytes(8); // size and type.
     int position = input.getPosition();
     int limit = input.limit();
@@ -112,7 +120,8 @@ import java.util.zip.Inflater;
     return null;
   }
 
-  private static @Nullable ArrayList<Mesh> parseMshp(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseMshp(ParsableByteArray input) {
     int version = input.readUnsignedByte();
     if (version != 0) {
       return null;
@@ -137,7 +146,8 @@ import java.util.zip.Inflater;
   }
 
   /** Parses MSHP data after the encoding_four_cc field. */
-  private static @Nullable ArrayList<Mesh> parseRawMshpData(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseRawMshpData(ParsableByteArray input) {
     ArrayList<Mesh> meshes = new ArrayList<>();
     int position = input.getPosition();
     int limit = input.limit();
@@ -160,7 +170,8 @@ import java.util.zip.Inflater;
     return meshes;
   }
 
-  private static @Nullable Mesh parseMesh(ParsableByteArray input) {
+  @Nullable
+  private static Mesh parseMesh(ParsableByteArray input) {
     // Read the coordinates.
     int coordinateCount = input.readInt();
     if (coordinateCount > MAX_COORDINATE_COUNT) {

@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.decoder;
 import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 import static com.google.android.exoplayer2.util.Assertions.checkNotEmpty;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -26,15 +27,23 @@ import com.google.android.exoplayer2.video.ColorInfo;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * The result of an evaluation to determine whether a decoder can be reused for a new input format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class DecoderReuseEvaluation {
 
   /** Possible outcomes of the evaluation. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     REUSE_RESULT_NO,
     REUSE_RESULT_YES_WITH_FLUSH,
@@ -57,6 +66,7 @@ public final class DecoderReuseEvaluation {
   /** Possible reasons why reuse is not possible. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef(
       flag = true,
       value = {
@@ -74,7 +84,8 @@ public final class DecoderReuseEvaluation {
         DISCARD_REASON_VIDEO_COLOR_INFO_CHANGED,
         DISCARD_REASON_AUDIO_CHANNEL_COUNT_CHANGED,
         DISCARD_REASON_AUDIO_SAMPLE_RATE_CHANGED,
-        DISCARD_REASON_AUDIO_ENCODING_CHANGED
+        DISCARD_REASON_AUDIO_ENCODING_CHANGED,
+        DISCARD_REASON_AUDIO_BYPASS_POSSIBLE
       })
   public @interface DecoderDiscardReasons {}
 
@@ -108,6 +119,8 @@ public final class DecoderReuseEvaluation {
   public static final int DISCARD_REASON_AUDIO_SAMPLE_RATE_CHANGED = 1 << 13;
   /** The audio encoding is changing. */
   public static final int DISCARD_REASON_AUDIO_ENCODING_CHANGED = 1 << 14;
+  /** The audio bypass mode is possible. */
+  public static final int DISCARD_REASON_AUDIO_BYPASS_POSSIBLE = 1 << 15;
 
   /** The name of the decoder. */
   public final String decoderName;
@@ -119,13 +132,13 @@ public final class DecoderReuseEvaluation {
   public final Format newFormat;
 
   /** The {@link DecoderReuseResult result} of the evaluation. */
-  @DecoderReuseResult public final int result;
+  public final @DecoderReuseResult int result;
 
   /**
    * {@link DecoderDiscardReasons Reasons} why the decoder cannot be reused. Always {@code 0} if
    * reuse is possible. May also be {code 0} if reuse is not possible for an unspecified reason.
    */
-  @DecoderDiscardReasons public final int discardReasons;
+  public final @DecoderDiscardReasons int discardReasons;
 
   /**
    * @param decoderName The name of the decoder.

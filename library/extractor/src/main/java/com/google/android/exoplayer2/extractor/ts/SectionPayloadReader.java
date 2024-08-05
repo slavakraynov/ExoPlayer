@@ -21,7 +21,15 @@ import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerat
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 
-/** Reads section data. */
+/**
+ * Reads section data.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public interface SectionPayloadReader {
 
   /**
@@ -32,7 +40,9 @@ public interface SectionPayloadReader {
    * @param idGenerator A {@link PesReader.TrackIdGenerator} that generates unique track ids for the
    *     {@link TrackOutput}s.
    */
-  void init(TimestampAdjuster timestampAdjuster, ExtractorOutput extractorOutput,
+  void init(
+      TimestampAdjuster timestampAdjuster,
+      ExtractorOutput extractorOutput,
       TrackIdGenerator idGenerator);
 
   /**
@@ -43,5 +53,4 @@ public interface SectionPayloadReader {
    *     Otherwise, all bytes belonging to the table section are included.
    */
   void consume(ParsableByteArray sectionData);
-
 }

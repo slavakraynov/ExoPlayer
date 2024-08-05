@@ -32,7 +32,13 @@ import org.xmlpull.v1.XmlPullParserFactory;
 /**
  * Parser for motion photo metadata, handling XMP following the Motion Photo V1 and Micro Video V1b
  * specifications.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class XmpMotionPhotoDescriptionParser {
 
   /**
@@ -85,7 +91,8 @@ import org.xmlpull.v1.XmlPullParserFactory;
     xpp.setInput(new StringReader(xmpString));
     xpp.next();
     if (!XmlPullParserUtil.isStartTag(xpp, "x:xmpmeta")) {
-      throw new ParserException("Couldn't find xmp metadata");
+      throw ParserException.createForMalformedContainer(
+          "Couldn't find xmp metadata", /* cause= */ null);
     }
     long motionPhotoPresentationTimestampUs = C.TIME_UNSET;
     List<MotionPhotoDescription.ContainerItem> containerItems = ImmutableList.of();

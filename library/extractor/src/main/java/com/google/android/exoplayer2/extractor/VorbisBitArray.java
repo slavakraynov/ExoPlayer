@@ -22,9 +22,15 @@ import com.google.android.exoplayer2.util.Assertions;
 /**
  * Wraps a byte array, providing methods that allow it to be read as a Vorbis bitstream.
  *
- * @see <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-360002">Vorbis bitpacking
- *     specification</a>
+ * <p>See the <a href="https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-360002">Vorbis
+ * bitpacking specification</a>
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class VorbisBitArray {
 
   private final byte[] data;
@@ -43,9 +49,7 @@ public final class VorbisBitArray {
     byteLimit = data.length;
   }
 
-  /**
-   * Resets the reading position to zero.
-   */
+  /** Resets the reading position to zero. */
   public void reset() {
     byteOffset = 0;
     bitOffset = 0;
@@ -97,9 +101,7 @@ public final class VorbisBitArray {
     assertValidOffset();
   }
 
-  /**
-   * Returns the reading position in bits.
-   */
+  /** Returns the reading position in bits. */
   public int getPosition() {
     return byteOffset * 8 + bitOffset;
   }
@@ -115,17 +117,14 @@ public final class VorbisBitArray {
     assertValidOffset();
   }
 
-  /**
-   * Returns the number of remaining bits.
-   */
+  /** Returns the number of remaining bits. */
   public int bitsLeft() {
     return (byteLimit - byteOffset) * 8 - bitOffset;
   }
 
   private void assertValidOffset() {
     // It is fine for position to be at the end of the array, but no further.
-    Assertions.checkState(byteOffset >= 0
-        && (byteOffset < byteLimit || (byteOffset == byteLimit && bitOffset == 0)));
+    Assertions.checkState(
+        byteOffset >= 0 && (byteOffset < byteLimit || (byteOffset == byteLimit && bitOffset == 0)));
   }
-
 }

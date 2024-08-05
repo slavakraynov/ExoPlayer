@@ -24,25 +24,30 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.SimpleDecoder;
+import com.google.android.exoplayer2.decoder.VideoDecoderOutputBuffer;
 import com.google.android.exoplayer2.util.Util;
-import com.google.android.exoplayer2.video.VideoDecoderInputBuffer;
-import com.google.android.exoplayer2.video.VideoDecoderOutputBuffer;
 import java.nio.ByteBuffer;
 
-/** Gav1 decoder. */
+/**
+ * Gav1 decoder.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
 @VisibleForTesting(otherwise = PACKAGE_PRIVATE)
+@Deprecated
 public final class Gav1Decoder
-    extends SimpleDecoder<VideoDecoderInputBuffer, VideoDecoderOutputBuffer, Gav1DecoderException> {
+    extends SimpleDecoder<DecoderInputBuffer, VideoDecoderOutputBuffer, Gav1DecoderException> {
 
-  // LINT.IfChange
   private static final int GAV1_ERROR = 0;
   private static final int GAV1_OK = 1;
   private static final int GAV1_DECODE_ONLY = 2;
-  // LINT.ThenChange(../../../../../../../jni/gav1_jni.cc)
 
   private final long gav1DecoderContext;
 
-  @C.VideoOutputMode private volatile int outputMode;
+  private volatile @C.VideoOutputMode int outputMode;
 
   /**
    * Creates a Gav1Decoder.
@@ -58,9 +63,7 @@ public final class Gav1Decoder
   public Gav1Decoder(
       int numInputBuffers, int numOutputBuffers, int initialInputBufferSize, int threads)
       throws Gav1DecoderException {
-    super(
-        new VideoDecoderInputBuffer[numInputBuffers],
-        new VideoDecoderOutputBuffer[numOutputBuffers]);
+    super(new DecoderInputBuffer[numInputBuffers], new VideoDecoderOutputBuffer[numOutputBuffers]);
     if (!Gav1Library.isAvailable()) {
       throw new Gav1DecoderException("Failed to load decoder native library.");
     }
@@ -88,8 +91,8 @@ public final class Gav1Decoder
   }
 
   @Override
-  protected VideoDecoderInputBuffer createInputBuffer() {
-    return new VideoDecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT);
+  protected DecoderInputBuffer createInputBuffer() {
+    return new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT);
   }
 
   @Override
@@ -100,7 +103,7 @@ public final class Gav1Decoder
   @Override
   @Nullable
   protected Gav1DecoderException decode(
-      VideoDecoderInputBuffer inputBuffer, VideoDecoderOutputBuffer outputBuffer, boolean reset) {
+      DecoderInputBuffer inputBuffer, VideoDecoderOutputBuffer outputBuffer, boolean reset) {
     ByteBuffer inputData = Util.castNonNull(inputBuffer.data);
     int inputSize = inputData.limit();
     if (gav1Decode(gav1DecoderContext, inputData, inputSize) == GAV1_ERROR) {
@@ -141,13 +144,13 @@ public final class Gav1Decoder
   }
 
   @Override
-  protected void releaseOutputBuffer(VideoDecoderOutputBuffer buffer) {
+  protected void releaseOutputBuffer(VideoDecoderOutputBuffer outputBuffer) {
     // Decode only frames do not acquire a reference on the internal decoder buffer and thus do not
     // require a call to gav1ReleaseFrame.
-    if (buffer.mode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && !buffer.isDecodeOnly()) {
-      gav1ReleaseFrame(gav1DecoderContext, buffer);
+    if (outputBuffer.mode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && !outputBuffer.isDecodeOnly()) {
+      gav1ReleaseFrame(gav1DecoderContext, outputBuffer);
     }
-    super.releaseOutputBuffer(buffer);
+    super.releaseOutputBuffer(outputBuffer);
   }
 
   /**

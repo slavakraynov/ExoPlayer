@@ -19,6 +19,7 @@ import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -34,14 +35,18 @@ import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSourceException;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -59,7 +64,7 @@ import org.mockito.Mockito;
  *
  * <p>Most implementations should pass all these tests. If necessary, subclasses can disable tests
  * by overriding the {@link Test @Test} method with a no-op implementation. It's recommended (but
- * not required) to also annotate this {@link Ignore @Ignore} so that JUnit correclty reports the
+ * not required) to also annotate this {@link Ignore @Ignore} so that JUnit correctly reports the
  * test as skipped/ignored instead of passing.
  */
 @RequiresApi(19)
@@ -119,8 +124,8 @@ public abstract class DataSourceContractTest {
         long length = dataSource.open(new DataSpec(resource.getUri()));
         byte[] data =
             unboundedReadsAreIndefinite()
-                ? Util.readExactly(dataSource, resource.getExpectedBytes().length)
-                : Util.readToEnd(dataSource);
+                ? DataSourceUtil.readExactly(dataSource, resource.getExpectedBytes().length)
+                : DataSourceUtil.readToEnd(dataSource);
 
         if (length != C.LENGTH_UNSET) {
           assertThat(length).isEqualTo(resource.getExpectedBytes().length);
@@ -148,8 +153,8 @@ public abstract class DataSourceContractTest {
                 new DataSpec.Builder().setUri(resource.getUri()).setPosition(3).build());
         byte[] data =
             unboundedReadsAreIndefinite()
-                ? Util.readExactly(dataSource, resource.getExpectedBytes().length - 3)
-                : Util.readToEnd(dataSource);
+                ? DataSourceUtil.readExactly(dataSource, resource.getExpectedBytes().length - 3)
+                : DataSourceUtil.readToEnd(dataSource);
 
         if (length != C.LENGTH_UNSET) {
           assertThat(length).isEqualTo(resource.getExpectedBytes().length - 3);
@@ -176,7 +181,7 @@ public abstract class DataSourceContractTest {
       try {
         long length =
             dataSource.open(new DataSpec.Builder().setUri(resource.getUri()).setLength(4).build());
-        byte[] data = Util.readToEnd(dataSource);
+        byte[] data = DataSourceUtil.readToEnd(dataSource);
 
         assertThat(length).isEqualTo(4);
         byte[] expectedData = Arrays.copyOf(resource.getExpectedBytes(), 4);
@@ -205,7 +210,7 @@ public abstract class DataSourceContractTest {
                     .setPosition(2)
                     .setLength(2)
                     .build());
-        byte[] data = Util.readToEnd(dataSource);
+        byte[] data = DataSourceUtil.readToEnd(dataSource);
 
         assertThat(length).isEqualTo(2);
         byte[] expectedData = Arrays.copyOfRange(resource.getExpectedBytes(), 2, 4);
@@ -218,7 +223,7 @@ public abstract class DataSourceContractTest {
   }
 
   @Test
-  public void dataSpecWithPositionAtEnd_throwsPositionOutOfRangeException() throws Exception {
+  public void dataSpecWithPositionAtEnd_readsZeroBytes() throws Exception {
     ImmutableList<TestResource> resources = getTestResources();
     Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
 
@@ -232,7 +237,9 @@ public abstract class DataSourceContractTest {
       try {
         long length = dataSource.open(dataSpec);
         byte[] data =
-            unboundedReadsAreIndefinite() ? Util.EMPTY_BYTE_ARRAY : Util.readToEnd(dataSource);
+            unboundedReadsAreIndefinite()
+                ? Util.EMPTY_BYTE_ARRAY
+                : DataSourceUtil.readToEnd(dataSource);
 
         // The DataSource.open() contract requires the returned length to equal the length in the
         // DataSpec if set. This is true even though the DataSource implementation may know that
@@ -249,8 +256,7 @@ public abstract class DataSourceContractTest {
   }
 
   @Test
-  public void dataSpecWithPositionAtEndAndLength_throwsPositionOutOfRangeException()
-      throws Exception {
+  public void dataSpecWithPositionAtEndAndLength_readsZeroBytes() throws Exception {
     ImmutableList<TestResource> resources = getTestResources();
     Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
 
@@ -268,7 +274,9 @@ public abstract class DataSourceContractTest {
       try {
         long length = dataSource.open(dataSpec);
         byte[] data =
-            unboundedReadsAreIndefinite() ? Util.EMPTY_BYTE_ARRAY : Util.readToEnd(dataSource);
+            unboundedReadsAreIndefinite()
+                ? Util.EMPTY_BYTE_ARRAY
+                : DataSourceUtil.readToEnd(dataSource);
 
         // The DataSource.open() contract requires the returned length to equal the length in the
         // DataSpec if set. This is true even though the DataSource implementation may know that
@@ -322,7 +330,7 @@ public abstract class DataSourceContractTest {
               .build();
       try {
         long length = dataSource.open(dataSpec);
-        byte[] data = Util.readExactly(dataSource, /* length= */ 1);
+        byte[] data = DataSourceUtil.readExactly(dataSource, /* length= */ 1);
         // TODO: Decide what the allowed behavior should be for the next read, and assert it.
 
         // The DataSource.open() contract requires the returned length to equal the length in the
@@ -362,8 +370,46 @@ public abstract class DataSourceContractTest {
                     .build());
         byte[] data =
             unboundedReadsAreIndefinite()
-                ? Util.readExactly(dataSource, resource.getExpectedBytes().length)
-                : Util.readToEnd(dataSource);
+                ? DataSourceUtil.readExactly(dataSource, resource.getExpectedBytes().length)
+                : DataSourceUtil.readToEnd(dataSource);
+
+        if (length != C.LENGTH_UNSET) {
+          assertThat(length).isEqualTo(resource.getExpectedBytes().length);
+        }
+        assertThat(data).isEqualTo(resource.getExpectedBytes());
+      } finally {
+        dataSource.close();
+      }
+      additionalFailureInfo.setInfo(null);
+    }
+  }
+
+  @Test
+  public void uriSchemeIsCaseInsensitive() throws Exception {
+    ImmutableList<TestResource> resources = getTestResources();
+    Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
+
+    for (int i = 0; i < resources.size(); i++) {
+      additionalFailureInfo.setInfo(getFailureLabel(resources, i));
+      TestResource resource = resources.get(i);
+      @Nullable String scheme = resource.getUri().getScheme();
+      if (scheme == null) {
+        // No scheme for which to check case-insensitivity.
+        continue;
+      }
+      DataSource dataSource = createDataSource();
+      Uri uri =
+          resource
+              .getUri()
+              .buildUpon()
+              .scheme(invertAsciiCaseOfEveryOtherCharacter(scheme))
+              .build();
+      try {
+        long length = dataSource.open(new DataSpec.Builder().setUri(uri).build());
+        byte[] data =
+            unboundedReadsAreIndefinite()
+                ? DataSourceUtil.readExactly(dataSource, resource.getExpectedBytes().length)
+                : DataSourceUtil.readToEnd(dataSource);
 
         if (length != C.LENGTH_UNSET) {
           assertThat(length).isEqualTo(resource.getExpectedBytes().length);
@@ -424,9 +470,9 @@ public abstract class DataSourceContractTest {
         inOrder.verifyNoMoreInteractions();
 
         if (unboundedReadsAreIndefinite()) {
-          Util.readExactly(dataSource, resource.getExpectedBytes().length);
+          DataSourceUtil.readExactly(dataSource, resource.getExpectedBytes().length);
         } else {
-          Util.readToEnd(dataSource);
+          DataSourceUtil.readToEnd(dataSource);
         }
         // Verify sufficient onBytesTransferred() callbacks have been triggered before closing the
         // DataSource.
@@ -500,6 +546,57 @@ public abstract class DataSourceContractTest {
   }
 
   @Test
+  public void getResponseHeaders_noNullKeysOrValues() throws Exception {
+    ImmutableList<TestResource> resources = getTestResources();
+    Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
+
+    for (int i = 0; i < resources.size(); i++) {
+      additionalFailureInfo.setInfo(getFailureLabel(resources, i));
+      TestResource resource = resources.get(i);
+      DataSource dataSource = createDataSource();
+      try {
+        dataSource.open(new DataSpec(resource.getUri()));
+
+        Map<String, List<String>> responseHeaders = dataSource.getResponseHeaders();
+        assertThat(responseHeaders).doesNotContainKey(null);
+        assertThat(responseHeaders.values()).doesNotContain(null);
+        for (List<String> value : responseHeaders.values()) {
+          assertThat(value).doesNotContain(null);
+        }
+      } finally {
+        dataSource.close();
+      }
+      additionalFailureInfo.setInfo(null);
+    }
+  }
+
+  @Test
+  public void getResponseHeaders_caseInsensitive() throws Exception {
+    ImmutableList<TestResource> resources = getTestResources();
+    Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
+
+    for (int i = 0; i < resources.size(); i++) {
+      additionalFailureInfo.setInfo(getFailureLabel(resources, i));
+      TestResource resource = resources.get(i);
+      DataSource dataSource = createDataSource();
+      try {
+        dataSource.open(new DataSpec(resource.getUri()));
+
+        Map<String, List<String>> responseHeaders = dataSource.getResponseHeaders();
+        for (String key : responseHeaders.keySet()) {
+          String caseFlippedKey = invertAsciiCaseOfEveryOtherCharacter(key);
+          assertWithMessage("key='%s', caseFlippedKey='%s'", key, caseFlippedKey)
+              .that(responseHeaders.get(caseFlippedKey))
+              .isEqualTo(responseHeaders.get(key));
+        }
+      } finally {
+        dataSource.close();
+      }
+      additionalFailureInfo.setInfo(null);
+    }
+  }
+
+  @Test
   public void getResponseHeaders_isEmptyWhileNotOpen() throws Exception {
     ImmutableList<TestResource> resources = getTestResources();
     Assertions.checkArgument(!resources.isEmpty(), "Must provide at least one test resource.");
@@ -544,6 +641,28 @@ public abstract class DataSourceContractTest {
     }
   }
 
+  private static String invertAsciiCaseOfEveryOtherCharacter(String input) {
+    StringBuilder result = new StringBuilder();
+    for (int i = 0; i < input.length(); i++) {
+      result.append(i % 2 == 0 ? invertAsciiCase(input.charAt(i)) : input.charAt(i));
+    }
+    return result.toString();
+  }
+
+  /**
+   * Returns {@code c} in the opposite case if it's an ASCII character, otherwise returns {@code c}
+   * unchanged.
+   */
+  private static char invertAsciiCase(char c) {
+    if (Ascii.isUpperCase(c)) {
+      return Ascii.toLowerCase(c);
+    } else if (Ascii.isLowerCase(c)) {
+      return Ascii.toUpperCase(c);
+    } else {
+      return c;
+    }
+  }
+
   /** Information about a resource that can be used to test the {@link DataSource} instance. */
   public static final class TestResource {
 
@@ -582,17 +701,20 @@ public abstract class DataSourceContractTest {
       /**
        * Sets a human-readable name for this resource which will be shown in test failure messages.
        */
+      @CanIgnoreReturnValue
       public Builder setName(String name) {
         this.name = name;
         return this;
       }
 
       /** Sets the URI where this resource is located. */
+      @CanIgnoreReturnValue
       public Builder setUri(String uri) {
         return setUri(Uri.parse(uri));
       }
 
       /** Sets the URI where this resource is located. */
+      @CanIgnoreReturnValue
       public Builder setUri(Uri uri) {
         this.uri = uri;
         return this;
@@ -603,6 +725,7 @@ public abstract class DataSourceContractTest {
        *
        * <p>Must be at least 5 bytes.
        */
+      @CanIgnoreReturnValue
       public Builder setExpectedBytes(byte[] expectedBytes) {
         checkArgument(expectedBytes.length >= 5);
         this.expectedBytes = expectedBytes;

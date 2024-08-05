@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.DefaultLoadControl.Builder;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
+import com.google.android.exoplayer2.util.Util;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,7 +32,7 @@ import org.junit.runner.RunWith;
 public class DefaultLoadControlTest {
 
   private static final float SPEED = 1f;
-  private static final long MAX_BUFFER_US = C.msToUs(DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
+  private static final long MAX_BUFFER_US = Util.msToUs(DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
   private static final long MIN_BUFFER_US = MAX_BUFFER_US / 2;
   private static final int TARGET_BUFFER_BYTES = C.DEFAULT_BUFFER_SEGMENT_SIZE * 2;
 
@@ -64,8 +65,8 @@ public class DefaultLoadControlTest {
   @Test
   public void shouldNotContinueLoadingOnceBufferingStopped_untilBelowMinBuffer() {
     builder.setBufferDurationsMs(
-        /* minBufferMs= */ (int) C.usToMs(MIN_BUFFER_US),
-        /* maxBufferMs= */ (int) C.usToMs(MAX_BUFFER_US),
+        /* minBufferMs= */ (int) Util.usToMs(MIN_BUFFER_US),
+        /* maxBufferMs= */ (int) Util.usToMs(MAX_BUFFER_US),
         /* bufferForPlaybackMs= */ 0,
         /* bufferForPlaybackAfterRebufferMs= */ 0);
     build();
@@ -88,7 +89,7 @@ public class DefaultLoadControlTest {
   public void continueLoadingOnceBufferingStopped_andBufferAlmostEmpty_evenIfMinBufferNotReached() {
     builder.setBufferDurationsMs(
         /* minBufferMs= */ 0,
-        /* maxBufferMs= */ (int) C.usToMs(MAX_BUFFER_US),
+        /* maxBufferMs= */ (int) Util.usToMs(MAX_BUFFER_US),
         /* bufferForPlaybackMs= */ 0,
         /* bufferForPlaybackAfterRebufferMs= */ 0);
     build();
@@ -107,8 +108,8 @@ public class DefaultLoadControlTest {
   public void shouldContinueLoadingWithTargetBufferBytesReached_untilMinBufferReached() {
     builder.setPrioritizeTimeOverSizeThresholds(true);
     builder.setBufferDurationsMs(
-        /* minBufferMs= */ (int) C.usToMs(MIN_BUFFER_US),
-        /* maxBufferMs= */ (int) C.usToMs(MAX_BUFFER_US),
+        /* minBufferMs= */ (int) Util.usToMs(MIN_BUFFER_US),
+        /* maxBufferMs= */ (int) Util.usToMs(MAX_BUFFER_US),
         /* bufferForPlaybackMs= */ 0,
         /* bufferForPlaybackAfterRebufferMs= */ 0);
     build();
@@ -158,8 +159,8 @@ public class DefaultLoadControlTest {
   @Test
   public void shouldContinueLoadingWithMinBufferReached_inFastPlayback() {
     builder.setBufferDurationsMs(
-        /* minBufferMs= */ (int) C.usToMs(MIN_BUFFER_US),
-        /* maxBufferMs= */ (int) C.usToMs(MAX_BUFFER_US),
+        /* minBufferMs= */ (int) Util.usToMs(MIN_BUFFER_US),
+        /* maxBufferMs= */ (int) Util.usToMs(MAX_BUFFER_US),
         /* bufferForPlaybackMs= */ 0,
         /* bufferForPlaybackAfterRebufferMs= */ 0);
     build();
@@ -177,7 +178,12 @@ public class DefaultLoadControlTest {
   @Test
   public void shouldContinueLoading_withNoSelectedTracks_returnsTrue() {
     loadControl = builder.build();
-    loadControl.onTracksSelected(new Renderer[0], TrackGroupArray.EMPTY, new ExoTrackSelection[0]);
+    loadControl.onTracksSelected(
+        Timeline.EMPTY,
+        LoadControl.EMPTY_MEDIA_PERIOD_ID,
+        new Renderer[0],
+        TrackGroupArray.EMPTY,
+        new ExoTrackSelection[0]);
 
     assertThat(
             loadControl.shouldContinueLoading(
@@ -201,6 +207,8 @@ public class DefaultLoadControlTest {
 
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 MIN_BUFFER_US,
                 SPEED,
                 /* rebuffering= */ false,
@@ -220,6 +228,8 @@ public class DefaultLoadControlTest {
 
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 2_999_999,
                 SPEED,
                 /* rebuffering= */ false,
@@ -227,6 +237,8 @@ public class DefaultLoadControlTest {
         .isFalse();
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 3_000_000,
                 SPEED,
                 /* rebuffering= */ false,
@@ -245,6 +257,8 @@ public class DefaultLoadControlTest {
 
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 499_999,
                 SPEED,
                 /* rebuffering= */ true,
@@ -252,6 +266,8 @@ public class DefaultLoadControlTest {
         .isFalse();
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 500_000,
                 SPEED,
                 /* rebuffering= */ true,
@@ -271,6 +287,8 @@ public class DefaultLoadControlTest {
 
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 3_999_999,
                 SPEED,
                 /* rebuffering= */ true,
@@ -278,6 +296,8 @@ public class DefaultLoadControlTest {
         .isFalse();
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 4_000_000,
                 SPEED,
                 /* rebuffering= */ true,
@@ -296,6 +316,8 @@ public class DefaultLoadControlTest {
 
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 499_999,
                 SPEED,
                 /* rebuffering= */ true,
@@ -303,6 +325,8 @@ public class DefaultLoadControlTest {
         .isFalse();
     assertThat(
             loadControl.shouldStartPlayback(
+                Timeline.EMPTY,
+                LoadControl.EMPTY_MEDIA_PERIOD_ID,
                 /* bufferedDurationUs= */ 500_000,
                 SPEED,
                 /* rebuffering= */ true,
@@ -313,7 +337,8 @@ public class DefaultLoadControlTest {
   private void build() {
     builder.setAllocator(allocator).setTargetBufferBytes(TARGET_BUFFER_BYTES);
     loadControl = builder.build();
-    loadControl.onTracksSelected(new Renderer[0], null, null);
+    loadControl.onTracksSelected(
+        Timeline.EMPTY, LoadControl.EMPTY_MEDIA_PERIOD_ID, new Renderer[0], null, null);
   }
 
   private void makeSureTargetBufferBytesReached() {

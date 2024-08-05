@@ -57,7 +57,13 @@ import java.util.TreeMap;
  * </ul>
  *
  * In both cases, the DASH media source will be notified, and a manifest reload should be triggered.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class PlayerEmsgHandler implements Handler.Callback {
 
   private static final int EMSG_MANIFEST_EXPIRED = 1;
@@ -135,7 +141,7 @@ public final class PlayerEmsgHandler implements Handler.Callback {
       return true;
     }
     switch (message.what) {
-      case (EMSG_MANIFEST_EXPIRED):
+      case EMSG_MANIFEST_EXPIRED:
         ManifestExpiryEventInfo messageObj = (ManifestExpiryEventInfo) message.obj;
         handleManifestExpiredMessage(
             messageObj.eventTimeUs, messageObj.manifestPublishTimeMsInEmsg);
@@ -290,8 +296,8 @@ public final class PlayerEmsgHandler implements Handler.Callback {
 
     @Override
     public void sampleMetadata(
-        long timeUs, int flags, int size, int offset, @Nullable CryptoData encryptionData) {
-      sampleQueue.sampleMetadata(timeUs, flags, size, offset, encryptionData);
+        long timeUs, int flags, int size, int offset, @Nullable CryptoData cryptoData) {
+      sampleQueue.sampleMetadata(timeUs, flags, size, offset, cryptoData);
       parseAndDiscardSamples();
     }
 

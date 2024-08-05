@@ -18,14 +18,28 @@ package com.google.android.exoplayer2.ext.flac;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.util.LibraryLoader;
 
-/** Configures and queries the underlying native library. */
+/**
+ * Configures and queries the underlying native library.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class FlacLibrary {
 
   static {
     ExoPlayerLibraryInfo.registerModule("goog.exo.flac");
   }
 
-  private static final LibraryLoader LOADER = new LibraryLoader("flacJNI");
+  private static final LibraryLoader LOADER =
+      new LibraryLoader("flacJNI") {
+        @Override
+        protected void loadLibrary(String name) {
+          System.loadLibrary(name);
+        }
+      };
 
   private FlacLibrary() {}
 
@@ -40,11 +54,8 @@ public final class FlacLibrary {
     LOADER.setLibraries(libraries);
   }
 
-  /**
-   * Returns whether the underlying library is available, loading it if necessary.
-   */
+  /** Returns whether the underlying library is available, loading it if necessary. */
   public static boolean isAvailable() {
     return LOADER.isAvailable();
   }
-
 }

@@ -15,12 +15,15 @@
  */
 package com.google.android.exoplayer2.offline;
 
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
+import android.text.TextUtils;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -35,7 +38,15 @@ import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A {@link DownloadIndex} that uses SQLite to persist {@link Download Downloads}. */
+/**
+ * A {@link DownloadIndex} that uses SQLite to persist {@link Download Downloads}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class DefaultDownloadIndex implements WritableDownloadIndex {
 
   private static final String TABLE_PREFIX = DatabaseProvider.TABLE_PREFIX + "Downloads";
@@ -371,7 +382,7 @@ public final class DefaultDownloadIndex implements WritableDownloadIndex {
   }
 
   /** Infers the MIME type from a v2 table row. */
-  private static String inferMimeType(String downloadType) {
+  private static String inferMimeType(@Nullable String downloadType) {
     if ("dash".equals(downloadType)) {
       return MimeTypes.APPLICATION_MPD;
     } else if ("hls".equals(downloadType)) {
@@ -412,7 +423,7 @@ public final class DefaultDownloadIndex implements WritableDownloadIndex {
           .append('.')
           .append(streamKey.groupIndex)
           .append('.')
-          .append(streamKey.trackIndex)
+          .append(streamKey.streamIndex)
           .append(',');
     }
     if (stringBuilder.length() > 0) {
@@ -441,8 +452,8 @@ public final class DefaultDownloadIndex implements WritableDownloadIndex {
     byte[] keySetId = cursor.getBlob(COLUMN_INDEX_KEY_SET_ID);
     DownloadRequest request =
         new DownloadRequest.Builder(
-                /* id= */ cursor.getString(COLUMN_INDEX_ID),
-                /* uri= */ Uri.parse(cursor.getString(COLUMN_INDEX_URI)))
+                /* id= */ checkNotNull(cursor.getString(COLUMN_INDEX_ID)),
+                /* uri= */ Uri.parse(checkNotNull(cursor.getString(COLUMN_INDEX_URI))))
             .setMimeType(cursor.getString(COLUMN_INDEX_MIME_TYPE))
             .setStreamKeys(decodeStreamKeys(cursor.getString(COLUMN_INDEX_STREAM_KEYS)))
             .setKeySetId(keySetId.length > 0 ? keySetId : null)
@@ -493,7 +504,8 @@ public final class DefaultDownloadIndex implements WritableDownloadIndex {
      */
     DownloadRequest request =
         new DownloadRequest.Builder(
-                /* id= */ cursor.getString(0), /* uri= */ Uri.parse(cursor.getString(2)))
+                /* id= */ checkNotNull(cursor.getString(0)),
+                /* uri= */ Uri.parse(checkNotNull(cursor.getString(2))))
             .setMimeType(inferMimeType(cursor.getString(1)))
             .setStreamKeys(decodeStreamKeys(cursor.getString(3)))
             .setCustomCacheKey(cursor.getString(4))
@@ -519,9 +531,9 @@ public final class DefaultDownloadIndex implements WritableDownloadIndex {
         downloadProgress);
   }
 
-  private static List<StreamKey> decodeStreamKeys(String encodedStreamKeys) {
+  private static List<StreamKey> decodeStreamKeys(@Nullable String encodedStreamKeys) {
     ArrayList<StreamKey> streamKeys = new ArrayList<>();
-    if (encodedStreamKeys.isEmpty()) {
+    if (TextUtils.isEmpty(encodedStreamKeys)) {
       return streamKeys;
     }
     String[] streamKeysStrings = Util.split(encodedStreamKeys, ",");

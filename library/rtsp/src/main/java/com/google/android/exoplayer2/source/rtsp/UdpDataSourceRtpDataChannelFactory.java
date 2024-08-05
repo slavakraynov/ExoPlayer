@@ -15,10 +15,18 @@
  */
 package com.google.android.exoplayer2.source.rtsp;
 
-import com.google.android.exoplayer2.util.Util;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import java.io.IOException;
 
-/** Factory for {@link UdpDataSourceRtpDataChannel}. */
+/**
+ * Factory for {@link UdpDataSourceRtpDataChannel}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class UdpDataSourceRtpDataChannelFactory implements RtpDataChannel.Factory {
 
   private final long socketTimeoutMs;
@@ -60,8 +68,8 @@ import java.io.IOException;
         return secondChannel;
       }
     } catch (IOException e) {
-      Util.closeQuietly(firstChannel);
-      Util.closeQuietly(secondChannel);
+      DataSourceUtil.closeQuietly(firstChannel);
+      DataSourceUtil.closeQuietly(secondChannel);
       throw e;
     }
   }

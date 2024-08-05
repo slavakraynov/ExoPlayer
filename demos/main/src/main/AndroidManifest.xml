@@ -23,6 +23,7 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
   <uses-feature android:name="android.software.leanback" android:required="false"/>
   <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -35,10 +36,11 @@
       android:largeHeap="true"
       android:allowBackup="false"
       android:requestLegacyExternalStorage="true"
+      android:supportsRtl="true"
       android:name="androidx.multidex.MultiDexApplication"
       tools:targetApi="29">
 
-    <activity android:name="com.google.android.exoplayer2.demo.SampleChooserActivity"
+    <activity android:name=".SampleChooserActivity"
         android:configChanges="keyboardHidden"
         android:label="@string/application_name"
         android:theme="@style/Theme.AppCompat"
@@ -50,6 +52,7 @@
       </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
+        <action android:name="com.google.android.exoplayer.demo.action.BROWSE"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="http"/>
@@ -62,7 +65,7 @@
       </intent-filter>
     </activity>
 
-    <activity android:name="com.google.android.exoplayer2.demo.PlayerActivity"
+    <activity android:name=".PlayerActivity"
         android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
         android:launchMode="singleTop"
         android:label="@string/application_name"
@@ -76,6 +79,13 @@
         <data android:scheme="content"/>
         <data android:scheme="asset"/>
         <data android:scheme="file"/>
+        <data android:scheme="ssai"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="com.google.android.exoplayer.demo.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="content"/>
+        <data android:mimeType="*/*"/>
       </intent-filter>
       <intent-filter>
         <action android:name="com.google.android.exoplayer.demo.action.VIEW_LIST"/>
@@ -83,7 +93,7 @@
       </intent-filter>
     </activity>
 
-    <service android:name="com.google.android.exoplayer2.demo.DemoDownloadService"
+    <service android:name=".DemoDownloadService"
         android:exported="false">
       <intent-filter>
         <action android:name="com.google.android.exoplayer.downloadService.action.RESTART"/>

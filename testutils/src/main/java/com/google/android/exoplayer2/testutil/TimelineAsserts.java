@@ -48,6 +48,7 @@ public final class TimelineAsserts {
   /**
    * Asserts that window tags are set correctly.
    *
+   * @param timeline The timeline to read actual window tags from.
    * @param expectedWindowTags A list of expected window tags. If a tag is unknown or not important
    *     {@code null} can be passed to skip this window.
    */
@@ -58,9 +59,9 @@ public final class TimelineAsserts {
     for (int i = 0; i < timeline.getWindowCount(); i++) {
       timeline.getWindow(i, window);
       if (expectedWindowTags[i] != null) {
-        MediaItem.PlaybackProperties playbackProperties = window.mediaItem.playbackProperties;
-        assertThat(playbackProperties).isNotNull();
-        assertThat(Util.castNonNull(playbackProperties).tag).isEqualTo(expectedWindowTags[i]);
+        MediaItem.LocalConfiguration localConfiguration = window.mediaItem.localConfiguration;
+        assertThat(localConfiguration).isNotNull();
+        assertThat(Util.castNonNull(localConfiguration).tag).isEqualTo(expectedWindowTags[i]);
       }
     }
   }

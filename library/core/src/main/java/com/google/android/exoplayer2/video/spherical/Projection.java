@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.video.spherical;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import androidx.annotation.IntDef;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.C.StereoMode;
@@ -22,13 +24,23 @@ import com.google.android.exoplayer2.util.Assertions;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/** The projection mesh used with 360/VR videos. */
+/**
+ * The projection mesh used with 360/VR videos.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class Projection {
 
   /** Enforces allowed (sub) mesh draw modes. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({DRAW_MODE_TRIANGLES, DRAW_MODE_TRIANGLES_STRIP, DRAW_MODE_TRIANGLES_FAN})
   public @interface DrawMode {}
   /** Triangle draw mode. */
@@ -109,7 +121,7 @@ import java.lang.annotation.RetentionPolicy;
 
       for (int i = 0; i < longitudes + 1; ++i) { // For each vertical edge in the band.
         for (int k = 0; k < 2; ++k) { // For low and high points on an edge.
-          // For each point, determine it's position in polar coordinates.
+          // For each point, determine its position in polar coordinates.
           float phi = k == 0 ? phiLow : phiHigh;
           float theta = quadWidthRads * i + (float) Math.PI - horizontalFovRads / 2;
 

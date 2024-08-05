@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.extractor;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -24,6 +26,7 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * A seeker that supports seeking within a stream by searching for the target frame using binary
@@ -34,7 +37,13 @@ import java.lang.annotation.RetentionPolicy;
  * seek time, the seeker will find the corresponding target timestamp, and perform a search
  * operation within the stream to identify the target frame and return the byte position in the
  * stream of the target frame.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public abstract class BinarySearchSeeker {
 
   /** A seeker that looks for a given timestamp from an input. */
@@ -405,6 +414,7 @@ public abstract class BinarySearchSeeker {
 
     @Documented
     @Retention(RetentionPolicy.SOURCE)
+    @Target(TYPE_USE)
     @IntDef({
       TYPE_TARGET_TIMESTAMP_FOUND,
       TYPE_POSITION_OVERESTIMATED,
@@ -414,10 +424,10 @@ public abstract class BinarySearchSeeker {
     @interface Type {}
 
     public static final TimestampSearchResult NO_TIMESTAMP_IN_RANGE_RESULT =
-        new TimestampSearchResult(TYPE_NO_TIMESTAMP, C.TIME_UNSET, C.POSITION_UNSET);
+        new TimestampSearchResult(TYPE_NO_TIMESTAMP, C.TIME_UNSET, C.INDEX_UNSET);
 
     /** The type of the result. */
-    @Type private final int type;
+    private final @Type int type;
 
     /**
      * When {@link #type} is {@link #TYPE_POSITION_OVERESTIMATED}, the {@link
@@ -528,7 +538,9 @@ public abstract class BinarySearchSeeker {
       return durationUs;
     }
 
-    /** @see SeekTimestampConverter#timeUsToTargetTime(long) */
+    /**
+     * @see SeekTimestampConverter#timeUsToTargetTime(long)
+     */
     public long timeUsToTargetTime(long timeUs) {
       return seekTimestampConverter.timeUsToTargetTime(timeUs);
     }

@@ -19,7 +19,15 @@ import android.util.Pair;
 import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.util.Assertions;
 
-/** Abstract base class for the concatenation of one or more {@link Timeline}s. */
+/**
+ * Abstract base class for the concatenation of one or more {@link Timeline}s.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public abstract class AbstractConcatenatedTimeline extends Timeline {
 
   private final int childCount;
@@ -32,7 +40,7 @@ public abstract class AbstractConcatenatedTimeline extends Timeline {
    * @param concatenatedUid UID of a period in a concatenated timeline.
    * @return UID of the child timeline this period belongs to.
    */
-  @SuppressWarnings("nullness:return.type.incompatible")
+  @SuppressWarnings("nullness:return")
   public static Object getChildTimelineUidFromConcatenatedUid(Object concatenatedUid) {
     return ((Pair<?, ?>) concatenatedUid).first;
   }
@@ -43,7 +51,7 @@ public abstract class AbstractConcatenatedTimeline extends Timeline {
    * @param concatenatedUid UID of a period in a concatenated timeline.
    * @return UID of the period in the child timeline.
    */
-  @SuppressWarnings("nullness:return.type.incompatible")
+  @SuppressWarnings("nullness:return")
   public static Object getChildPeriodUidFromConcatenatedUid(Object concatenatedUid) {
     return ((Pair<?, ?>) concatenatedUid).second;
   }
@@ -207,14 +215,14 @@ public abstract class AbstractConcatenatedTimeline extends Timeline {
   }
 
   @Override
-  public final Period getPeriodByUid(Object uid, Period period) {
-    Object childUid = getChildTimelineUidFromConcatenatedUid(uid);
-    Object periodUid = getChildPeriodUidFromConcatenatedUid(uid);
+  public final Period getPeriodByUid(Object periodUid, Period period) {
+    Object childUid = getChildTimelineUidFromConcatenatedUid(periodUid);
+    Object childPeriodUid = getChildPeriodUidFromConcatenatedUid(periodUid);
     int childIndex = getChildIndexByChildUid(childUid);
     int firstWindowIndexInChild = getFirstWindowIndexByChildIndex(childIndex);
-    getTimelineByChildIndex(childIndex).getPeriodByUid(periodUid, period);
+    getTimelineByChildIndex(childIndex).getPeriodByUid(childPeriodUid, period);
     period.windowIndex += firstWindowIndexInChild;
-    period.uid = uid;
+    period.uid = periodUid;
     return period;
   }
 
@@ -240,12 +248,12 @@ public abstract class AbstractConcatenatedTimeline extends Timeline {
       return C.INDEX_UNSET;
     }
     Object childUid = getChildTimelineUidFromConcatenatedUid(uid);
-    Object periodUid = getChildPeriodUidFromConcatenatedUid(uid);
+    Object childPeriodUid = getChildPeriodUidFromConcatenatedUid(uid);
     int childIndex = getChildIndexByChildUid(childUid);
     if (childIndex == C.INDEX_UNSET) {
       return C.INDEX_UNSET;
     }
-    int periodIndexInChild = getTimelineByChildIndex(childIndex).getIndexOfPeriod(periodUid);
+    int periodIndexInChild = getTimelineByChildIndex(childIndex).getIndexOfPeriod(childPeriodUid);
     return periodIndexInChild == C.INDEX_UNSET
         ? C.INDEX_UNSET
         : getFirstPeriodIndexByChildIndex(childIndex) + periodIndexInChild;

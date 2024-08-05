@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.source.chunk;
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.C.DataType;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -31,34 +32,37 @@ import java.util.Map;
 /**
  * An abstract base class for {@link Loadable} implementations that load chunks of data required for
  * the playback of streams.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public abstract class Chunk implements Loadable {
 
   /** Identifies the load task for this loadable. */
   public final long loadTaskId;
   /** The {@link DataSpec} that defines the data to be loaded. */
   public final DataSpec dataSpec;
-  /**
-   * The type of the chunk. One of the {@code DATA_TYPE_*} constants defined in {@link C}. For
-   * reporting only.
-   */
-  public final int type;
+  /** The {@link DataType data type} of the chunk. For reporting only. */
+  public final @DataType int type;
   /** The format of the track to which this chunk belongs. */
   public final Format trackFormat;
   /**
-   * One of the {@link C} {@code SELECTION_REASON_*} constants if the chunk belongs to a track.
-   * {@link C#SELECTION_REASON_UNKNOWN} if the chunk does not belong to a track, or if the selection
-   * reason is unknown.
+   * One of the {@link C.SelectionReason selection reasons} if the chunk belongs to a track. {@link
+   * C#SELECTION_REASON_UNKNOWN} if the chunk does not belong to a track, or if the selection reason
+   * is unknown.
    */
-  public final int trackSelectionReason;
+  public final @C.SelectionReason int trackSelectionReason;
   /**
    * Optional data associated with the selection of the track to which this chunk belongs. Null if
    * the chunk does not belong to a track, or if there is no associated track selection data.
    */
   @Nullable public final Object trackSelectionData;
   /**
-   * The start time of the media contained by the chunk, or {@link C#TIME_UNSET} if the data
-   * being loaded does not contain media samples.
+   * The start time of the media contained by the chunk, or {@link C#TIME_UNSET} if the data being
+   * loaded does not contain media samples.
    */
   public final long startTimeUs;
   /**
@@ -82,9 +86,9 @@ public abstract class Chunk implements Loadable {
   public Chunk(
       DataSource dataSource,
       DataSpec dataSpec,
-      int type,
+      @DataType int type,
       Format trackFormat,
-      int trackSelectionReason,
+      @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
       long startTimeUs,
       long endTimeUs) {
@@ -99,9 +103,7 @@ public abstract class Chunk implements Loadable {
     loadTaskId = LoadEventInfo.getNewId();
   }
 
-  /**
-   * Returns the duration of the chunk in microseconds.
-   */
+  /** Returns the duration of the chunk in microseconds. */
   public final long getDurationUs() {
     return endTimeUs - startTimeUs;
   }

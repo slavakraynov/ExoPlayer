@@ -29,7 +29,15 @@ import com.google.android.exoplayer2.util.Util;
 import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
 
-/** An {@link RtpDataChannel} that transfers received data in-memory. */
+/**
+ * An {@link RtpDataChannel} that transfers received data in-memory.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class TransferRtpDataChannel extends BaseDataSource
     implements RtpDataChannel, RtspMessageChannel.InterleavedBinaryDataListener {
 
@@ -68,6 +76,12 @@ import java.util.concurrent.LinkedBlockingQueue;
   }
 
   @Override
+  public boolean needsClosingOnLoadCompletion() {
+    // TCP channel is managed by the RTSP mesasge channel and does not need closing from here.
+    return false;
+  }
+
+  @Override
   public InterleavedBinaryDataListener getInterleavedBinaryDataListener() {
     return this;
   }
@@ -88,14 +102,14 @@ import java.util.concurrent.LinkedBlockingQueue;
   }
 
   @Override
-  public int read(byte[] target, int offset, int length) {
+  public int read(byte[] buffer, int offset, int length) {
     if (length == 0) {
       return 0;
     }
 
     int bytesRead = 0;
     int bytesToRead = min(length, unreadData.length);
-    System.arraycopy(unreadData, /* srcPos= */ 0, target, offset, bytesToRead);
+    System.arraycopy(unreadData, /* srcPos= */ 0, buffer, offset, bytesToRead);
     bytesRead += bytesToRead;
     unreadData = Arrays.copyOfRange(unreadData, bytesToRead, unreadData.length);
 
@@ -115,7 +129,7 @@ import java.util.concurrent.LinkedBlockingQueue;
     }
 
     bytesToRead = min(length - bytesRead, data.length);
-    System.arraycopy(data, /* srcPos= */ 0, target, offset + bytesRead, bytesToRead);
+    System.arraycopy(data, /* srcPos= */ 0, buffer, offset + bytesRead, bytesToRead);
     if (bytesToRead < data.length) {
       unreadData = Arrays.copyOfRange(data, bytesToRead, data.length);
     }

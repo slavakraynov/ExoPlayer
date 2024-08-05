@@ -55,10 +55,10 @@ import com.google.android.exoplayer2.extractor.TrackOutput.CryptoData;
 import com.google.android.exoplayer2.upstream.DataReader;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.MediaFormatUtil;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.Util;
-import com.google.android.exoplayer2.video.ColorInfo;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -73,12 +73,18 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 /**
  * {@link MediaParser.OutputConsumer} implementation that redirects output to an {@link
  * ExtractorOutput}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
 @RequiresApi(30)
 @SuppressLint("Override") // TODO: Remove once the SDK becomes stable.
+@Deprecated
 public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsumer {
 
-  private static final String TAG = "OutputConsumerAdapterV30";
+  private static final String TAG = "OConsumerAdapterV30";
 
   private static final Pair<MediaParser.SeekPoint, MediaParser.SeekPoint> SEEK_POINT_PAIR_START =
       Pair.create(MediaParser.SeekPoint.START, MediaParser.SeekPoint.START);
@@ -97,7 +103,7 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
   private final ArrayList<@NullableType CryptoData> lastOutputCryptoDatas;
   private final DataReaderAdapter scratchDataReaderAdapter;
   private final boolean expectDummySeekMap;
-  private final int primaryTrackType;
+  private final @C.TrackType int primaryTrackType;
   @Nullable private final Format primaryTrackManifestFormat;
 
   private ExtractorOutput extractorOutput;
@@ -130,14 +136,14 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
    *
    * @param primaryTrackManifestFormat The manifest-obtained format of the primary track, or null if
    *     not applicable.
-   * @param primaryTrackType The type of the primary track, or {@link C#TRACK_TYPE_NONE} if there is
-   *     no primary track. Must be one of the {@link C C.TRACK_TYPE_*} constants.
+   * @param primaryTrackType The {@link C.TrackType type} of the primary track. {@link
+   *     C#TRACK_TYPE_NONE} if there is no primary track.
    * @param expectDummySeekMap Whether the output consumer should expect an initial dummy seek map
    *     which should be exposed through {@link #getDummySeekMap()}.
    */
   public OutputConsumerAdapterV30(
       @Nullable Format primaryTrackManifestFormat,
-      int primaryTrackType,
+      @C.TrackType int primaryTrackType,
       boolean expectDummySeekMap) {
     this.expectDummySeekMap = expectDummySeekMap;
     this.primaryTrackManifestFormat = primaryTrackManifestFormat;
@@ -217,7 +223,7 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
   }
 
   /**
-   * Defines the container mime type to propagate through {@link TrackOutput#format}.
+   * Defines the container MIME type to propagate through {@link TrackOutput#format}.
    *
    * @param parserName The name of the selected parser.
    */
@@ -429,7 +435,7 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
     tracksEnded = true;
   }
 
-  private static int toTrackTypeConstant(@Nullable String string) {
+  private static @C.TrackType int toTrackTypeConstant(@Nullable String string) {
     if (string == null) {
       return C.TRACK_TYPE_UNKNOWN;
     }
@@ -472,7 +478,7 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
             .setChannelCount(
                 mediaFormat.getInteger(
                     MediaFormat.KEY_CHANNEL_COUNT, /* defaultValue= */ Format.NO_VALUE))
-            .setColorInfo(getColorInfo(mediaFormat))
+            .setColorInfo(MediaFormatUtil.getColorInfo(mediaFormat))
             .setSampleMimeType(mediaFormatMimeType)
             .setCodecs(mediaFormat.getString(MediaFormat.KEY_CODECS_STRING))
             .setFrameRate(
@@ -538,8 +544,7 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
     return new DrmInitData(schemeType, schemeDatas);
   }
 
-  @SelectionFlags
-  private static int getSelectionFlags(MediaFormat mediaFormat) {
+  private static @SelectionFlags int getSelectionFlags(MediaFormat mediaFormat) {
     int selectionFlags = 0;
     selectionFlags |=
         getFlag(
@@ -571,38 +576,9 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
       if (byteBuffer == null) {
         break;
       }
-      initData.add(getArray(byteBuffer));
+      initData.add(MediaFormatUtil.getArray(byteBuffer));
     }
     return initData;
-  }
-
-  @Nullable
-  private static ColorInfo getColorInfo(MediaFormat mediaFormat) {
-    @Nullable
-    ByteBuffer hdrStaticInfoByteBuffer = mediaFormat.getByteBuffer(MediaFormat.KEY_HDR_STATIC_INFO);
-    @Nullable
-    byte[] hdrStaticInfo =
-        hdrStaticInfoByteBuffer != null ? getArray(hdrStaticInfoByteBuffer) : null;
-    int colorTransfer =
-        mediaFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER, /* defaultValue= */ Format.NO_VALUE);
-    int colorRange =
-        mediaFormat.getInteger(MediaFormat.KEY_COLOR_RANGE, /* defaultValue= */ Format.NO_VALUE);
-    int colorStandard =
-        mediaFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD, /* defaultValue= */ Format.NO_VALUE);
-
-    if (hdrStaticInfo != null
-        || colorTransfer != Format.NO_VALUE
-        || colorRange != Format.NO_VALUE
-        || colorStandard != Format.NO_VALUE) {
-      return new ColorInfo(colorStandard, colorRange, colorTransfer, hdrStaticInfo);
-    }
-    return null;
-  }
-
-  private static byte[] getArray(ByteBuffer byteBuffer) {
-    byte[] array = new byte[byteBuffer.remaining()];
-    byteBuffer.get(array);
-    return array;
   }
 
   private static String getMimeType(String parserName) {
@@ -684,8 +660,8 @@ public final class OutputConsumerAdapterV30 implements MediaParser.OutputConsume
     @Nullable public MediaParser.InputReader input;
 
     @Override
-    public int read(byte[] target, int offset, int length) throws IOException {
-      return Util.castNonNull(input).read(target, offset, length);
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+      return Util.castNonNull(input).read(buffer, offset, length);
     }
   }
 }

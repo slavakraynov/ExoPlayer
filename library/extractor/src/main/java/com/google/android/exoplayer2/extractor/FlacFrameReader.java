@@ -16,7 +16,7 @@
 package com.google.android.exoplayer2.extractor;
 
 import com.google.android.exoplayer2.ParserException;
-import com.google.android.exoplayer2.util.FlacConstants;
+import com.google.android.exoplayer2.extractor.flac.FlacConstants;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
@@ -24,7 +24,13 @@ import java.io.IOException;
 /**
  * Reads and peeks FLAC frame elements according to the <a
  * href="https://xiph.org/flac/format.html">FLAC format specification</a>.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class FlacFrameReader {
 
   /** Holds a sample number. */
@@ -130,6 +136,7 @@ public final class FlacFrameReader {
    * there is no guarantee on the peek position.
    *
    * @param input Input stream to get the sample number from (starting from the read position).
+   * @param flacStreamMetadata The FLAC metadata of the stream.
    * @return The frame first sample number.
    * @throws ParserException If an error occurs parsing the sample number.
    * @throws IOException If peeking from the input fails.
@@ -153,7 +160,7 @@ public final class FlacFrameReader {
     SampleNumberHolder sampleNumberHolder = new SampleNumberHolder();
     if (!checkAndReadFirstSampleNumber(
         scratch, flacStreamMetadata, isBlockSizeVariable, sampleNumberHolder)) {
-      throw new ParserException();
+      throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
     }
 
     return sampleNumberHolder.sampleNumber;

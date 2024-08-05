@@ -33,7 +33,15 @@ import java.util.Collections;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Parses and extracts samples from an AAC/LATM elementary stream. */
+/**
+ * Parses and extracts samples from an AAC/LATM elementary stream.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class LatmReader implements ElementaryStreamReader {
 
   private static final int STATE_FINDING_SYNC_1 = 0;
@@ -80,11 +88,13 @@ public final class LatmReader implements ElementaryStreamReader {
     this.language = language;
     sampleDataBuffer = new ParsableByteArray(INITIAL_BUFFER_SIZE);
     sampleBitArray = new ParsableBitArray(sampleDataBuffer.getData());
+    timeUs = C.TIME_UNSET;
   }
 
   @Override
   public void seek() {
     state = STATE_FINDING_SYNC_1;
+    timeUs = C.TIME_UNSET;
     streamMuxRead = false;
   }
 
@@ -97,7 +107,9 @@ public final class LatmReader implements ElementaryStreamReader {
 
   @Override
   public void packetStarted(long pesTimeUs, @TsPayloadReader.Flags int flags) {
-    timeUs = pesTimeUs;
+    if (pesTimeUs != C.TIME_UNSET) {
+      timeUs = pesTimeUs;
+    }
   }
 
   @Override
@@ -166,7 +178,7 @@ public final class LatmReader implements ElementaryStreamReader {
 
     if (audioMuxVersionA == 0) {
       if (numSubframes != 0) {
-        throw new ParserException();
+        throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
       }
       int muxSlotLengthBytes = parsePayloadLengthInfo(data);
       parsePayloadMux(data, muxSlotLengthBytes);
@@ -174,7 +186,8 @@ public final class LatmReader implements ElementaryStreamReader {
         data.skipBits((int) otherDataLenBits);
       }
     } else {
-      throw new ParserException(); // Not defined by ISO/IEC 14496-3:2009.
+      // Not defined by ISO/IEC 14496-3:2009.
+      throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
     }
   }
 
@@ -188,13 +201,13 @@ public final class LatmReader implements ElementaryStreamReader {
         latmGetValue(data); // Skip taraBufferFullness.
       }
       if (!data.readBit()) {
-        throw new ParserException();
+        throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
       }
       numSubframes = data.readBits(6);
       int numProgram = data.readBits(4);
       int numLayer = data.readBits(3);
       if (numProgram != 0 || numLayer != 0) {
-        throw new ParserException();
+        throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
       }
       if (audioMuxVersion == 0) {
         int startPosition = data.getPosition();
@@ -241,7 +254,8 @@ public final class LatmReader implements ElementaryStreamReader {
         data.skipBits(8); // crcCheckSum.
       }
     } else {
-      throw new ParserException(); // This is not defined by ISO/IEC 14496-3:2009.
+      // This is not defined by ISO/IEC 14496-3:2009.
+      throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
     }
   }
 
@@ -288,7 +302,7 @@ public final class LatmReader implements ElementaryStreamReader {
       } while (tmp == 255);
       return muxSlotLengthBytes;
     } else {
-      throw new ParserException();
+      throw ParserException.createForMalformedContainer(/* message= */ null, /* cause= */ null);
     }
   }
 
@@ -306,8 +320,10 @@ public final class LatmReader implements ElementaryStreamReader {
       sampleDataBuffer.setPosition(0);
     }
     output.sampleData(sampleDataBuffer, muxLengthBytes);
-    output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, muxLengthBytes, 0, null);
-    timeUs += sampleDurationUs;
+    if (timeUs != C.TIME_UNSET) {
+      output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, muxLengthBytes, 0, null);
+      timeUs += sampleDurationUs;
+    }
   }
 
   private void resetBufferForSize(int newSize) {
@@ -319,5 +335,4 @@ public final class LatmReader implements ElementaryStreamReader {
     int bytesForValue = data.readBits(2);
     return data.readBits((bytesForValue + 1) * 8);
   }
-
 }

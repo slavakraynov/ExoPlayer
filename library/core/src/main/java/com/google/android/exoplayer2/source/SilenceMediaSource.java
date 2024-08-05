@@ -18,12 +18,14 @@ package com.google.android.exoplayer2.source;
 import static java.lang.Math.min;
 
 import android.net.Uri;
+import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.SeekParameters;
+import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.upstream.Allocator;
@@ -31,10 +33,19 @@ import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.ArrayList;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
-/** Media source with a single period consisting of silent raw audio of a given duration. */
+/**
+ * Media source with a single period consisting of silent raw audio of a given duration.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class SilenceMediaSource extends BaseMediaSource {
 
   /** Factory for {@link SilenceMediaSource SilenceMediaSources}. */
@@ -49,20 +60,20 @@ public final class SilenceMediaSource extends BaseMediaSource {
      * @param durationUs The duration of silent audio to output, in microseconds.
      * @return This factory, for convenience.
      */
-    public Factory setDurationUs(long durationUs) {
+    @CanIgnoreReturnValue
+    public Factory setDurationUs(@IntRange(from = 1) long durationUs) {
       this.durationUs = durationUs;
       return this;
     }
 
     /**
-     * Sets a tag for the media source which will be published in the {@link
-     * com.google.android.exoplayer2.Timeline} of the source as {@link
-     * com.google.android.exoplayer2.MediaItem.PlaybackProperties#tag
-     * Window#mediaItem.playbackProperties.tag}.
+     * Sets a tag for the media source which will be published in the {@link Timeline} of the source
+     * as {@link MediaItem.LocalConfiguration#tag Window#mediaItem.localConfiguration.tag}.
      *
      * @param tag A tag for the media source.
      * @return This factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setTag(@Nullable Object tag) {
       this.tag = tag;
       return this;
@@ -83,7 +94,7 @@ public final class SilenceMediaSource extends BaseMediaSource {
   public static final String MEDIA_ID = "SilenceMediaSource";
 
   private static final int SAMPLE_RATE_HZ = 44100;
-  @C.PcmEncoding private static final int PCM_ENCODING = C.ENCODING_PCM_16BIT;
+  private static final @C.PcmEncoding int PCM_ENCODING = C.ENCODING_PCM_16BIT;
   private static final int CHANNEL_COUNT = 2;
   private static final Format FORMAT =
       new Format.Builder()
@@ -147,17 +158,6 @@ public final class SilenceMediaSource extends BaseMediaSource {
 
   @Override
   public void releasePeriod(MediaPeriod mediaPeriod) {}
-
-  /**
-   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Nullable
-  @Override
-  public Object getTag() {
-    return Assertions.checkNotNull(mediaItem.playbackProperties).tag;
-  }
 
   @Override
   public MediaItem getMediaItem() {

@@ -26,6 +26,7 @@ import android.os.Looper;
 import android.util.Pair;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.source.MediaLoadData;
 import com.google.android.exoplayer2.source.MediaPeriod;
@@ -115,7 +116,8 @@ public class MediaSourceTestRunner {
     final IOException[] prepareError = new IOException[1];
     runOnPlaybackThread(
         () -> {
-          mediaSource.prepareSource(mediaSourceListener, /* mediaTransferListener= */ null);
+          mediaSource.prepareSource(
+              mediaSourceListener, /* mediaTransferListener= */ null, PlayerId.UNSET);
           try {
             // TODO: This only catches errors that are set synchronously in prepareSource. To
             // capture async errors we'll need to poll maybeThrowSourceInfoRefreshError until the
@@ -148,6 +150,7 @@ public class MediaSourceTestRunner {
    * playback thread, asserting that a non-null {@link MediaPeriod} is returned.
    *
    * @param periodId The id of the period to create.
+   * @param startPositionUs The expected start position, in microseconds.
    * @return The created {@link MediaPeriod}.
    */
   public MediaPeriod createPeriod(final MediaPeriodId periodId, long startPositionUs) {

@@ -15,7 +15,8 @@
  */
 package com.google.android.exoplayer2.offline;
 
-import android.net.Uri;
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.MediaItem;
@@ -32,7 +33,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** A downloader for progressive media streams. */
+/**
+ * A downloader for progressive media streams.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class ProgressiveDownloader implements Downloader {
 
   private final Executor executor;
@@ -45,14 +54,6 @@ public final class ProgressiveDownloader implements Downloader {
   private volatile @MonotonicNonNull RunnableFutureTask<Void, IOException> downloadRunnable;
   private volatile boolean isCanceled;
 
-  /** @deprecated Use {@link #ProgressiveDownloader(MediaItem, CacheDataSource.Factory)} instead. */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public ProgressiveDownloader(
-      Uri uri, @Nullable String customCacheKey, CacheDataSource.Factory cacheDataSourceFactory) {
-    this(uri, customCacheKey, cacheDataSourceFactory, Runnable::run);
-  }
-
   /**
    * Creates a new instance.
    *
@@ -63,22 +64,6 @@ public final class ProgressiveDownloader implements Downloader {
   public ProgressiveDownloader(
       MediaItem mediaItem, CacheDataSource.Factory cacheDataSourceFactory) {
     this(mediaItem, cacheDataSourceFactory, Runnable::run);
-  }
-
-  /**
-   * @deprecated Use {@link #ProgressiveDownloader(MediaItem, CacheDataSource.Factory, Executor)}
-   *     instead.
-   */
-  @Deprecated
-  public ProgressiveDownloader(
-      Uri uri,
-      @Nullable String customCacheKey,
-      CacheDataSource.Factory cacheDataSourceFactory,
-      Executor executor) {
-    this(
-        new MediaItem.Builder().setUri(uri).setCustomCacheKey(customCacheKey).build(),
-        cacheDataSourceFactory,
-        executor);
   }
 
   /**
@@ -94,22 +79,18 @@ public final class ProgressiveDownloader implements Downloader {
   public ProgressiveDownloader(
       MediaItem mediaItem, CacheDataSource.Factory cacheDataSourceFactory, Executor executor) {
     this.executor = Assertions.checkNotNull(executor);
-    Assertions.checkNotNull(mediaItem.playbackProperties);
+    Assertions.checkNotNull(mediaItem.localConfiguration);
     dataSpec =
         new DataSpec.Builder()
-            .setUri(mediaItem.playbackProperties.uri)
-            .setKey(mediaItem.playbackProperties.customCacheKey)
+            .setUri(mediaItem.localConfiguration.uri)
+            .setKey(mediaItem.localConfiguration.customCacheKey)
             .setFlags(DataSpec.FLAG_ALLOW_CACHE_FRAGMENTATION)
             .build();
     dataSource = cacheDataSourceFactory.createDataSourceForDownloading();
-    @SuppressWarnings("methodref.receiver.bound.invalid")
+    @SuppressWarnings("nullness:methodref.receiver.bound")
     CacheWriter.ProgressListener progressListener = this::onProgress;
     cacheWriter =
-        new CacheWriter(
-            dataSource,
-            dataSpec,
-            /* temporaryBuffer= */ null,
-            progressListener);
+        new CacheWriter(dataSource, dataSpec, /* temporaryBuffer= */ null, progressListener);
     priorityTaskManager = cacheDataSourceFactory.getUpstreamPriorityTaskManager();
   }
 
@@ -117,26 +98,26 @@ public final class ProgressiveDownloader implements Downloader {
   public void download(@Nullable ProgressListener progressListener)
       throws IOException, InterruptedException {
     this.progressListener = progressListener;
-    downloadRunnable =
-        new RunnableFutureTask<Void, IOException>() {
-          @Override
-          protected Void doWork() throws IOException {
-            cacheWriter.cache();
-            return null;
-          }
-
-          @Override
-          protected void cancelWork() {
-            cacheWriter.cancel();
-          }
-        };
-
     if (priorityTaskManager != null) {
       priorityTaskManager.add(C.PRIORITY_DOWNLOAD);
     }
     try {
       boolean finished = false;
       while (!finished && !isCanceled) {
+        // Recreate downloadRunnable on each loop iteration to avoid rethrowing a previous error.
+        downloadRunnable =
+            new RunnableFutureTask<Void, IOException>() {
+              @Override
+              protected Void doWork() throws IOException {
+                cacheWriter.cache();
+                return null;
+              }
+
+              @Override
+              protected void cancelWork() {
+                cacheWriter.cancel();
+              }
+            };
         if (priorityTaskManager != null) {
           priorityTaskManager.proceed(C.PRIORITY_DOWNLOAD);
         }
@@ -159,7 +140,7 @@ public final class ProgressiveDownloader implements Downloader {
     } finally {
       // If the main download thread was interrupted as part of cancelation, then it's possible that
       // the runnable is still doing work. We need to wait until it's finished before returning.
-      downloadRunnable.blockUntilFinished();
+      checkNotNull(downloadRunnable).blockUntilFinished();
       if (priorityTaskManager != null) {
         priorityTaskManager.remove(C.PRIORITY_DOWNLOAD);
       }

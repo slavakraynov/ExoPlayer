@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunkIterator;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
+import com.google.android.exoplayer2.util.Log;
 import java.util.List;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
@@ -33,7 +34,13 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
  * {@link #updateSelectedTrack(long, long, long, List, MediaChunkIterator[])} or {@link
  * #evaluateQueueSize(long, List)}. This only happens between calls to {@link #enable()} and {@link
  * #disable()}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public interface ExoTrackSelection extends TrackSelection {
 
   /** Contains of a subset of selected tracks belonging to a {@link TrackGroup}. */
@@ -43,7 +50,9 @@ public interface ExoTrackSelection extends TrackSelection {
     /** The indices of the selected tracks in {@link #group}. */
     public final int[] tracks;
     /** The type that will be returned from {@link TrackSelection#getType()}. */
-    public final int type;
+    public final @Type int type;
+
+    private static final String TAG = "ETSDefinition";
 
     /**
      * @param group The {@link TrackGroup}. Must not be null.
@@ -60,7 +69,11 @@ public interface ExoTrackSelection extends TrackSelection {
      *     null or empty. May be in any order.
      * @param type The type that will be returned from {@link TrackSelection#getType()}.
      */
-    public Definition(TrackGroup group, int[] tracks, int type) {
+    public Definition(TrackGroup group, int[] tracks, @Type int type) {
+      if (tracks.length == 0) {
+        // TODO: Turn this into an assertion.
+        Log.e(TAG, "Empty tracks are not allowed", new IllegalArgumentException());
+      }
       this.group = group;
       this.tracks = tracks;
       this.type = type;
@@ -122,6 +135,7 @@ public interface ExoTrackSelection extends TrackSelection {
   int getSelectedIndex();
 
   /** Returns the reason for the current track selection. */
+  @C.SelectionReason
   int getSelectionReason();
 
   /** Returns optional data associated with the current track selection. */
@@ -134,9 +148,9 @@ public interface ExoTrackSelection extends TrackSelection {
    * Called to notify the selection of the current playback speed. The playback speed may affect
    * adaptive track selection.
    *
-   * @param speed The factor by which playback is sped up.
+   * @param playbackSpeed The factor by which playback is sped up.
    */
-  void onPlaybackSpeed(float speed);
+  void onPlaybackSpeed(float playbackSpeed);
 
   /**
    * Called to notify the selection of a position discontinuity.
@@ -270,7 +284,7 @@ public interface ExoTrackSelection extends TrackSelection {
    *     milliseconds.
    * @return Whether exclusion was successful.
    */
-  boolean blacklist(int index, long exclusionDurationMs);
+  boolean excludeTrack(int index, long exclusionDurationMs);
 
   /**
    * Returns whether the track at the specified index in the selection is excluded.
@@ -279,5 +293,15 @@ public interface ExoTrackSelection extends TrackSelection {
    * @param nowMs The current time in the timebase of {@link
    *     android.os.SystemClock#elapsedRealtime()}.
    */
-  boolean isBlacklisted(int index, long nowMs);
+  boolean isTrackExcluded(int index, long nowMs);
+
+  /**
+   * Returns the most recent bitrate estimate utilised for track selection.
+   *
+   * <p>The default behavior is to return {@link Long#MIN_VALUE}, indicating that the bitrate
+   * estimate was not computed for the track selection decision.
+   */
+  default long getLatestBitrateEstimate() {
+    return Long.MIN_VALUE;
+  }
 }

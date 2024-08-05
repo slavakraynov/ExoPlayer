@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.extractor.flv;
 
 import static java.lang.Math.max;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import com.google.android.exoplayer2.C;
@@ -32,10 +33,19 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Extracts data from the FLV container format. */
+/**
+ * Extracts data from the FLV container format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class FlvExtractor implements Extractor {
 
   /** Factory for {@link FlvExtractor} instances. */
@@ -44,6 +54,7 @@ public final class FlvExtractor implements Extractor {
   /** Extractor states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     STATE_READING_FLV_HEADER,
     STATE_SKIPPING_TO_TAG_HEADER,
@@ -198,12 +209,12 @@ public final class FlvExtractor implements Extractor {
     boolean hasAudio = (flags & 0x04) != 0;
     boolean hasVideo = (flags & 0x01) != 0;
     if (hasAudio && audioReader == null) {
-      audioReader = new AudioTagPayloadReader(
-          extractorOutput.track(TAG_TYPE_AUDIO, C.TRACK_TYPE_AUDIO));
+      audioReader =
+          new AudioTagPayloadReader(extractorOutput.track(TAG_TYPE_AUDIO, C.TRACK_TYPE_AUDIO));
     }
     if (hasVideo && videoReader == null) {
-      videoReader = new VideoTagPayloadReader(
-          extractorOutput.track(TAG_TYPE_VIDEO, C.TRACK_TYPE_VIDEO));
+      videoReader =
+          new VideoTagPayloadReader(extractorOutput.track(TAG_TYPE_VIDEO, C.TRACK_TYPE_VIDEO));
     }
     extractorOutput.endTracks();
 

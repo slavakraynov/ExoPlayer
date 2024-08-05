@@ -26,14 +26,27 @@ import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.scheduler.Requirements;
 import com.google.android.exoplayer2.scheduler.Scheduler;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 
-/** A {@link Scheduler} that uses {@link WorkManager}. */
+/**
+ * A {@link Scheduler} that uses {@link WorkManager}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class WorkManagerScheduler implements Scheduler {
+
+  static {
+    ExoPlayerLibraryInfo.registerModule("goog.exo.workmanager");
+  }
 
   private static final String TAG = "WorkManagerScheduler";
   private static final String KEY_SERVICE_ACTION = "service_action";
@@ -48,14 +61,6 @@ public final class WorkManagerScheduler implements Scheduler {
 
   private final WorkManager workManager;
   private final String workName;
-
-  /** @deprecated Call {@link #WorkManagerScheduler(Context, String)} instead. */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  public WorkManagerScheduler(String workName) {
-    this.workName = workName;
-    workManager = WorkManager.getInstance();
-  }
 
   /**
    * @param context A context.

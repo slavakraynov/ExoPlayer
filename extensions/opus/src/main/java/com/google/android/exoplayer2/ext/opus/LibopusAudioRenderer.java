@@ -24,13 +24,20 @@ import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.AudioSink.SinkFormatSupport;
 import com.google.android.exoplayer2.audio.DecoderAudioRenderer;
-import com.google.android.exoplayer2.audio.OpusUtil;
-import com.google.android.exoplayer2.drm.ExoMediaCrypto;
+import com.google.android.exoplayer2.decoder.CryptoConfig;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
 
-/** Decodes and renders audio using the native Opus decoder. */
+/**
+ * Decodes and renders audio using the native Opus decoder.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class LibopusAudioRenderer extends DecoderAudioRenderer<OpusDecoder> {
 
   private static final String TAG = "LibopusAudioRenderer";
@@ -79,11 +86,8 @@ public class LibopusAudioRenderer extends DecoderAudioRenderer<OpusDecoder> {
   }
 
   @Override
-  @C.FormatSupport
-  protected int supportsFormatInternal(Format format) {
-    boolean drmIsSupported =
-        format.exoMediaCryptoType == null
-            || OpusLibrary.matchesExpectedExoMediaCryptoType(format.exoMediaCryptoType);
+  protected @C.FormatSupport int supportsFormatInternal(Format format) {
+    boolean drmIsSupported = OpusLibrary.supportsCryptoType(format.cryptoType);
     if (!OpusLibrary.isAvailable()
         || !MimeTypes.AUDIO_OPUS.equalsIgnoreCase(format.sampleMimeType)) {
       return C.FORMAT_UNSUPPORTED_TYPE;
@@ -97,8 +101,9 @@ public class LibopusAudioRenderer extends DecoderAudioRenderer<OpusDecoder> {
     }
   }
 
+  /** {@inheritDoc} */
   @Override
-  protected OpusDecoder createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto)
+  protected final OpusDecoder createDecoder(Format format, @Nullable CryptoConfig cryptoConfig)
       throws OpusDecoderException {
     TraceUtil.beginSection("createOpusDecoder");
     @SinkFormatSupport
@@ -115,17 +120,29 @@ public class LibopusAudioRenderer extends DecoderAudioRenderer<OpusDecoder> {
             NUM_BUFFERS,
             initialInputBufferSize,
             format.initializationData,
-            mediaCrypto,
+            cryptoConfig,
             outputFloat);
+    decoder.experimentalSetDiscardPaddingEnabled(experimentalGetDiscardPaddingEnabled());
 
     TraceUtil.endSection();
     return decoder;
   }
 
+  /** {@inheritDoc} */
   @Override
-  protected Format getOutputFormat(OpusDecoder decoder) {
+  protected final Format getOutputFormat(OpusDecoder decoder) {
     @C.PcmEncoding
     int pcmEncoding = decoder.outputFloat ? C.ENCODING_PCM_FLOAT : C.ENCODING_PCM_16BIT;
-    return Util.getPcmFormat(pcmEncoding, decoder.channelCount, OpusUtil.SAMPLE_RATE);
+    return Util.getPcmFormat(pcmEncoding, decoder.channelCount, OpusDecoder.SAMPLE_RATE);
+  }
+
+  /**
+   * Returns true if support for padding removal from the end of decoder output buffer should be
+   * enabled.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release.
+   */
+  protected boolean experimentalGetDiscardPaddingEnabled() {
+    return false;
   }
 }

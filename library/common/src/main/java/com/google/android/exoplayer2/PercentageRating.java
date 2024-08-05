@@ -19,14 +19,19 @@ import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 
 import android.os.Bundle;
 import androidx.annotation.FloatRange;
-import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.util.Util;
 import com.google.common.base.Objects;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
-/** A rating expressed as a percentage. */
+/**
+ * A rating expressed as a percentage.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class PercentageRating extends Rating {
 
   private final float percent;
@@ -74,20 +79,15 @@ public final class PercentageRating extends Rating {
 
   // Bundleable implementation.
 
-  @RatingType private static final int TYPE = RATING_TYPE_PERCENTAGE;
+  private static final @RatingType int TYPE = RATING_TYPE_PERCENTAGE;
 
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef({FIELD_RATING_TYPE, FIELD_PERCENT})
-  private @interface FieldNumber {}
-
-  private static final int FIELD_PERCENT = 1;
+  private static final String FIELD_PERCENT = Util.intToStringMaxRadix(1);
 
   @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
-    bundle.putInt(keyForField(FIELD_RATING_TYPE), TYPE);
-    bundle.putFloat(keyForField(FIELD_PERCENT), percent);
+    bundle.putInt(FIELD_RATING_TYPE, TYPE);
+    bundle.putFloat(FIELD_PERCENT, percent);
     return bundle;
   }
 
@@ -95,14 +95,8 @@ public final class PercentageRating extends Rating {
   public static final Creator<PercentageRating> CREATOR = PercentageRating::fromBundle;
 
   private static PercentageRating fromBundle(Bundle bundle) {
-    checkArgument(
-        bundle.getInt(keyForField(FIELD_RATING_TYPE), /* defaultValue= */ RATING_TYPE_DEFAULT)
-            == TYPE);
-    float percent = bundle.getFloat(keyForField(FIELD_PERCENT), /* defaultValue= */ RATING_UNSET);
+    checkArgument(bundle.getInt(FIELD_RATING_TYPE, /* defaultValue= */ RATING_TYPE_UNSET) == TYPE);
+    float percent = bundle.getFloat(FIELD_PERCENT, /* defaultValue= */ RATING_UNSET);
     return percent == RATING_UNSET ? new PercentageRating() : new PercentageRating(percent);
-  }
-
-  private static String keyForField(@FieldNumber int field) {
-    return Integer.toString(field, Character.MAX_RADIX);
   }
 }

@@ -29,7 +29,15 @@ import com.google.android.exoplayer2.util.ParsableByteArray;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Parses a continuous MPEG Audio byte stream and extracts individual frames. */
+/**
+ * Parses a continuous MPEG Audio byte stream and extracts individual frames.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class MpegAudioReader implements ElementaryStreamReader {
 
   private static final int STATE_FINDING_HEADER = 0;
@@ -69,6 +77,7 @@ public final class MpegAudioReader implements ElementaryStreamReader {
     headerScratch = new ParsableByteArray(4);
     headerScratch.getData()[0] = (byte) 0xFF;
     header = new MpegAudioUtil.Header();
+    timeUs = C.TIME_UNSET;
     this.language = language;
   }
 
@@ -77,6 +86,7 @@ public final class MpegAudioReader implements ElementaryStreamReader {
     state = STATE_FINDING_HEADER;
     frameBytesRead = 0;
     lastByteWasFF = false;
+    timeUs = C.TIME_UNSET;
   }
 
   @Override
@@ -88,7 +98,9 @@ public final class MpegAudioReader implements ElementaryStreamReader {
 
   @Override
   public void packetStarted(long pesTimeUs, @TsPayloadReader.Flags int flags) {
-    timeUs = pesTimeUs;
+    if (pesTimeUs != C.TIME_UNSET) {
+      timeUs = pesTimeUs;
+    }
   }
 
   @Override
@@ -118,13 +130,13 @@ public final class MpegAudioReader implements ElementaryStreamReader {
 
   /**
    * Attempts to locate the start of the next frame header.
-   * <p>
-   * If a frame header is located then the state is changed to {@link #STATE_READING_HEADER}, the
+   *
+   * <p>If a frame header is located then the state is changed to {@link #STATE_READING_HEADER}, the
    * first two bytes of the header are written into {@link #headerScratch}, and the position of the
    * source is advanced to the byte that immediately follows these two bytes.
-   * <p>
-   * If a frame header is not located then the position of the source is advanced to the limit, and
-   * the method should be called again with the next source to continue the search.
+   *
+   * <p>If a frame header is not located then the position of the source is advanced to the limit,
+   * and the method should be called again with the next source to continue the search.
    *
    * @param source The source from which to read.
    */
@@ -227,8 +239,10 @@ public final class MpegAudioReader implements ElementaryStreamReader {
       return;
     }
 
-    output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, frameSize, 0, null);
-    timeUs += frameDurationUs;
+    if (timeUs != C.TIME_UNSET) {
+      output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, frameSize, 0, null);
+      timeUs += frameDurationUs;
+    }
     frameBytesRead = 0;
     state = STATE_FINDING_HEADER;
   }

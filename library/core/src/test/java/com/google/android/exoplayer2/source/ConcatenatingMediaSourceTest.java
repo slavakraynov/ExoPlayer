@@ -24,6 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.MediaSource.MediaSourceCaller;
 import com.google.android.exoplayer2.source.ShuffleOrder.DefaultShuffleOrder;
@@ -362,7 +363,7 @@ public final class ConcatenatingMediaSourceTest {
           new FakeMediaSource(Timeline.EMPTY),
           new FakeMediaSource(Timeline.EMPTY),
         };
-    Timeline nonEmptyTimeline = new FakeTimeline(/* windowCount = */ 1);
+    Timeline nonEmptyTimeline = new FakeTimeline(/* windowCount= */ 1);
 
     mediaSource.addMediaSources(Arrays.asList(childSources));
     Timeline timeline = testRunner.prepareSource();
@@ -444,7 +445,7 @@ public final class ConcatenatingMediaSourceTest {
     testThread.runOnMainThread(
         () ->
             mediaSource.addMediaSource(
-                /* index */ 0,
+                /* index= */ 0,
                 createFakeMediaSource(),
                 Util.createHandlerForCurrentLooper(),
                 runnableInvoked::countDown));
@@ -462,7 +463,7 @@ public final class ConcatenatingMediaSourceTest {
     testThread.runOnMainThread(
         () ->
             mediaSource.addMediaSources(
-                /* index */ 0,
+                /* index= */ 0,
                 Arrays.asList(new MediaSource[] {createFakeMediaSource(), createFakeMediaSource()}),
                 Util.createHandlerForCurrentLooper(),
                 runnableInvoked::countDown));
@@ -481,7 +482,7 @@ public final class ConcatenatingMediaSourceTest {
         () -> {
           mediaSource.addMediaSource(createFakeMediaSource());
           mediaSource.removeMediaSource(
-              /* index */ 0, Util.createHandlerForCurrentLooper(), runnableInvoked::countDown);
+              /* index= */ 0, Util.createHandlerForCurrentLooper(), runnableInvoked::countDown);
         });
     runnableInvoked.await(MediaSourceTestRunner.TIMEOUT_MS, MILLISECONDS);
     testThread.release();
@@ -556,7 +557,7 @@ public final class ConcatenatingMediaSourceTest {
       testThread.runOnMainThread(
           () ->
               mediaSource.addMediaSource(
-                  /* index */ 0,
+                  /* index= */ 0,
                   createFakeMediaSource(),
                   Util.createHandlerForCurrentLooper(),
                   timelineGrabber));
@@ -576,7 +577,7 @@ public final class ConcatenatingMediaSourceTest {
       testThread.runOnMainThread(
           () ->
               mediaSource.addMediaSources(
-                  /* index */ 0,
+                  /* index= */ 0,
                   Arrays.asList(
                       new MediaSource[] {createFakeMediaSource(), createFakeMediaSource()}),
                   Util.createHandlerForCurrentLooper(),
@@ -600,7 +601,7 @@ public final class ConcatenatingMediaSourceTest {
       testThread.runOnMainThread(
           () ->
               mediaSource.removeMediaSource(
-                  /* index */ 0, Util.createHandlerForCurrentLooper(), timelineGrabber));
+                  /* index= */ 0, Util.createHandlerForCurrentLooper(), timelineGrabber));
       Timeline timeline = timelineGrabber.assertTimelineChangeBlocking();
       assertThat(timeline.getWindowCount()).isEqualTo(0);
     } finally {
@@ -644,7 +645,7 @@ public final class ConcatenatingMediaSourceTest {
           () -> {
             MediaSourceCaller caller = mock(MediaSourceCaller.class);
             mediaSource.addMediaSources(Arrays.asList(createMediaSources(2)));
-            mediaSource.prepareSource(caller, /* mediaTransferListener= */ null);
+            mediaSource.prepareSource(caller, /* mediaTransferListener= */ null, PlayerId.UNSET);
             mediaSource.moveMediaSource(
                 /* currentIndex= */ 0,
                 /* newIndex= */ 1,
@@ -1113,7 +1114,7 @@ public final class ConcatenatingMediaSourceTest {
   }
 
   private static FakeMediaSource createFakeMediaSource() {
-    return new FakeMediaSource(createFakeTimeline(/* index */ 0));
+    return new FakeMediaSource(createFakeTimeline(/* index= */ 0));
   }
 
   private static FakeTimeline createFakeTimeline(int index) {

@@ -21,7 +21,13 @@ import androidx.annotation.Nullable;
 /**
  * Interface for time bar views that can display a playback position, buffered position, duration
  * and ad markers, and that have a listener for scrubbing (seeking) events.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public interface TimeBar {
 
   /**
@@ -45,8 +51,8 @@ public interface TimeBar {
 
   /**
    * Sets the position increment for key presses and accessibility actions, in milliseconds.
-   * <p>
-   * Clears any increment specified in a preceding call to {@link #setKeyCountIncrement(int)}.
+   *
+   * <p>Clears any increment specified in a preceding call to {@link #setKeyCountIncrement(int)}.
    *
    * @param time The time increment, in milliseconds.
    */
@@ -56,8 +62,8 @@ public interface TimeBar {
    * Sets the position increment for key presses and accessibility actions, as a number of
    * increments that divide the duration of the media. For example, passing 20 will cause key
    * presses to increment/decrement the position by 1/20th of the duration (if known).
-   * <p>
-   * Clears any increment specified in a preceding call to {@link #setKeyTimeIncrement(long)}.
+   *
+   * <p>Clears any increment specified in a preceding call to {@link #setKeyTimeIncrement(long)}.
    *
    * @param count The number of increments that divide the duration of the media.
    */
@@ -102,12 +108,10 @@ public interface TimeBar {
    *     groups.
    * @param adGroupCount The number of ad groups.
    */
-  void setAdGroupTimesMs(@Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups,
-      int adGroupCount);
+  void setAdGroupTimesMs(
+      @Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups, int adGroupCount);
 
-  /**
-   * Listener for scrubbing events.
-   */
+  /** Listener for scrubbing events. */
   interface OnScrubListener {
 
     /**
@@ -135,5 +139,4 @@ public interface TimeBar {
      */
     void onScrubStop(TimeBar timeBar, long position, boolean canceled);
   }
-
 }

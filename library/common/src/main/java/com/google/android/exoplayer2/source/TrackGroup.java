@@ -15,22 +15,59 @@
  */
 package com.google.android.exoplayer2.source;
 
-import android.os.Parcel;
-import android.os.Parcelable;
+import static com.google.android.exoplayer2.util.Assertions.checkArgument;
+
+import android.os.Bundle;
+import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.Bundleable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.Tracks;
+import com.google.android.exoplayer2.util.BundleableUtil;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Util;
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
-/** Defines an immutable group of tracks identified by their format identity. */
-public final class TrackGroup implements Parcelable {
+/**
+ * An immutable group of tracks available within a media stream. All tracks in a group present the
+ * same content, but their formats may differ.
+ *
+ * <p>As an example of how tracks can be grouped, consider an adaptive playback where a main video
+ * feed is provided in five resolutions, and an alternative video feed (e.g., a different camera
+ * angle in a sports match) is provided in two resolutions. In this case there will be two video
+ * track groups, one corresponding to the main video feed containing five tracks, and a second for
+ * the alternative video feed containing two tracks.
+ *
+ * <p>Note that audio tracks whose languages differ are not grouped, because content in different
+ * languages is not considered to be the same. Conversely, audio tracks in the same language that
+ * only differ in properties such as bitrate, sampling rate, channel count and so on can be grouped.
+ * This also applies to text tracks.
+ *
+ * <p>Note also that this class only contains information derived from the media itself. Unlike
+ * {@link Tracks.Group}, it does not include runtime information such as the extent to which
+ * playback of each track is supported by the device, or which tracks are currently selected.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
+public final class TrackGroup implements Bundleable {
 
   private static final String TAG = "TrackGroup";
 
   /** The number of tracks in the group. */
   public final int length;
+  /** An identifier for the track group. */
+  public final String id;
+  /** The type of tracks in the group. */
+  public final @C.TrackType int type;
 
   private final Format[] formats;
 
@@ -38,21 +75,42 @@ public final class TrackGroup implements Parcelable {
   private int hashCode;
 
   /**
-   * @param formats The track formats. At least one {@link Format} must be provided.
+   * Constructs a track group containing the provided {@code formats}.
+   *
+   * @param formats The list of {@link Format Formats}. Must not be empty.
    */
   public TrackGroup(Format... formats) {
-    Assertions.checkState(formats.length > 0);
+    this(/* id= */ "", formats);
+  }
+
+  /**
+   * Constructs a track group with the provided {@code id} and {@code formats}.
+   *
+   * @param id The identifier of the track group. May be an empty string.
+   * @param formats The list of {@link Format Formats}. Must not be empty.
+   */
+  public TrackGroup(String id, Format... formats) {
+    checkArgument(formats.length > 0);
+    this.id = id;
     this.formats = formats;
     this.length = formats.length;
+    @C.TrackType int type = MimeTypes.getTrackType(formats[0].sampleMimeType);
+    if (type == C.TRACK_TYPE_UNKNOWN) {
+      type = MimeTypes.getTrackType(formats[0].containerMimeType);
+    }
+    this.type = type;
     verifyCorrectness();
   }
 
-  /* package */ TrackGroup(Parcel in) {
-    length = in.readInt();
-    formats = new Format[length];
-    for (int i = 0; i < length; i++) {
-      formats[i] = in.readParcelable(Format.class.getClassLoader());
-    }
+  /**
+   * Returns a copy of this track group with the specified {@code id}.
+   *
+   * @param id The identifier for the copy of the track group.
+   * @return The copied track group.
+   */
+  @CheckResult
+  public TrackGroup copyWithId(String id) {
+    return new TrackGroup(id, formats);
   }
 
   /**
@@ -87,6 +145,7 @@ public final class TrackGroup implements Parcelable {
   public int hashCode() {
     if (hashCode == 0) {
       int result = 17;
+      result = 31 * result + id.hashCode();
       result = 31 * result + Arrays.hashCode(formats);
       hashCode = result;
     }
@@ -102,36 +161,35 @@ public final class TrackGroup implements Parcelable {
       return false;
     }
     TrackGroup other = (TrackGroup) obj;
-    return length == other.length && Arrays.equals(formats, other.formats);
+    return id.equals(other.id) && Arrays.equals(formats, other.formats);
   }
 
-  // Parcelable implementation.
+  // Bundleable implementation.
+  private static final String FIELD_FORMATS = Util.intToStringMaxRadix(0);
+  private static final String FIELD_ID = Util.intToStringMaxRadix(1);
 
   @Override
-  public int describeContents() {
-    return 0;
-  }
-
-  @Override
-  public void writeToParcel(Parcel dest, int flags) {
-    dest.writeInt(length);
-    for (int i = 0; i < length; i++) {
-      dest.writeParcelable(formats[i], 0);
+  public Bundle toBundle() {
+    Bundle bundle = new Bundle();
+    ArrayList<Bundle> arrayList = new ArrayList<>(formats.length);
+    for (Format format : formats) {
+      arrayList.add(format.toBundle(/* excludeMetadata= */ true));
     }
+    bundle.putParcelableArrayList(FIELD_FORMATS, arrayList);
+    bundle.putString(FIELD_ID, id);
+    return bundle;
   }
 
-  public static final Parcelable.Creator<TrackGroup> CREATOR =
-      new Parcelable.Creator<TrackGroup>() {
-
-        @Override
-        public TrackGroup createFromParcel(Parcel in) {
-          return new TrackGroup(in);
-        }
-
-        @Override
-        public TrackGroup[] newArray(int size) {
-          return new TrackGroup[size];
-        }
+  /** Object that can restore {@code TrackGroup} from a {@link Bundle}. */
+  public static final Creator<TrackGroup> CREATOR =
+      bundle -> {
+        @Nullable List<Bundle> formatBundles = bundle.getParcelableArrayList(FIELD_FORMATS);
+        List<Format> formats =
+            formatBundles == null
+                ? ImmutableList.of()
+                : BundleableUtil.fromBundleList(Format.CREATOR, formatBundles);
+        String id = bundle.getString(FIELD_ID, /* defaultValue= */ "");
+        return new TrackGroup(id, formats.toArray(new Format[0]));
       };
 
   private void verifyCorrectness() {
@@ -166,8 +224,7 @@ public final class TrackGroup implements Parcelable {
     return language == null || language.equals(C.LANGUAGE_UNDETERMINED) ? "" : language;
   }
 
-  @C.RoleFlags
-  private static int normalizeRoleFlags(@C.RoleFlags int roleFlags) {
+  private static @C.RoleFlags int normalizeRoleFlags(@C.RoleFlags int roleFlags) {
     // Treat trick-play and non-trick-play formats as compatible.
     return roleFlags | C.ROLE_FLAG_TRICK_PLAY;
   }

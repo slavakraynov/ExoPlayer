@@ -35,7 +35,13 @@ import com.google.android.exoplayer2.util.Assertions;
 /**
  * Listener of audio {@link Renderer} events. All methods have no-op default implementations to
  * allow selective overrides.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public interface AudioRendererEventListener {
 
   /**
@@ -57,7 +63,9 @@ public interface AudioRendererEventListener {
   default void onAudioDecoderInitialized(
       String decoderName, long initializedTimestampMs, long initializationDurationMs) {}
 
-  /** @deprecated Use {@link #onAudioInputFormatChanged(Format, DecoderReuseEvaluation)}. */
+  /**
+   * @deprecated Use {@link #onAudioInputFormatChanged(Format, DecoderReuseEvaluation)}.
+   */
   @Deprecated
   default void onAudioInputFormatChanged(Format format) {}
 
@@ -130,7 +138,7 @@ public interface AudioRendererEventListener {
   /**
    * Called when {@link AudioSink} has encountered an error.
    *
-   * <p>If the sink writes to a platform {@link AudioTrack}, this will called for all {@link
+   * <p>If the sink writes to a platform {@link AudioTrack}, this will be called for all {@link
    * AudioTrack} errors.
    *
    * <p>This method being called does not indicate that playback has failed, or that it will fail.

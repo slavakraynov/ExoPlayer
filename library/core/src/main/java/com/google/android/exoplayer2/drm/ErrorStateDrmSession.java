@@ -17,11 +17,20 @@ package com.google.android.exoplayer2.drm;
 
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.decoder.CryptoConfig;
 import com.google.android.exoplayer2.util.Assertions;
 import java.util.Map;
 import java.util.UUID;
 
-/** A {@link DrmSession} that's in a terminal error state. */
+/**
+ * A {@link DrmSession} that's in a terminal error state.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class ErrorStateDrmSession implements DrmSession {
 
   private final DrmSessionException error;
@@ -53,7 +62,7 @@ public final class ErrorStateDrmSession implements DrmSession {
 
   @Override
   @Nullable
-  public ExoMediaCrypto getMediaCrypto() {
+  public CryptoConfig getCryptoConfig() {
     return null;
   }
 
@@ -67,6 +76,11 @@ public final class ErrorStateDrmSession implements DrmSession {
   @Nullable
   public byte[] getOfflineLicenseKeySetId() {
     return null;
+  }
+
+  @Override
+  public boolean requiresSecureDecoder(String mimeType) {
+    return false;
   }
 
   @Override

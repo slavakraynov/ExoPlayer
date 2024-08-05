@@ -15,10 +15,11 @@
  */
 package com.google.android.exoplayer2.transformer;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.testutil.DumpableFormat;
 import com.google.android.exoplayer2.testutil.Dumper;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,45 +27,57 @@ import java.util.List;
 
 /**
  * An implementation of {@link Muxer} that supports dumping information about all interactions (for
- * testing purposes) and delegates the actual muxing operations to a {@link FrameworkMuxer}.
+ * testing purposes) and delegates the actual muxing operations to another {@link Muxer} created
+ * using the factory provided.
  */
 public final class TestMuxer implements Muxer, Dumper.Dumpable {
 
-  private final Muxer frameworkMuxer;
+  private final Muxer muxer;
   private final List<Dumper.Dumpable> dumpables;
 
   /** Creates a new test muxer. */
-  public TestMuxer(String path, String outputMimeType) throws IOException {
-    frameworkMuxer = new FrameworkMuxer.Factory().create(path, outputMimeType);
+  public TestMuxer(String path, Muxer.Factory muxerFactory) throws MuxerException {
+    muxer = muxerFactory.create(path);
     dumpables = new ArrayList<>();
-    dumpables.add(dumper -> dumper.add("containerMimeType", outputMimeType));
   }
 
   // Muxer implementation.
 
   @Override
-  public boolean supportsSampleMimeType(String mimeType) {
-    return frameworkMuxer.supportsSampleMimeType(mimeType);
-  }
-
-  @Override
-  public int addTrack(Format format) {
-    int trackIndex = frameworkMuxer.addTrack(format);
+  public int addTrack(Format format) throws MuxerException {
+    int trackIndex = muxer.addTrack(format);
     dumpables.add(new DumpableFormat(format, trackIndex));
     return trackIndex;
   }
 
   @Override
   public void writeSampleData(
-      int trackIndex, ByteBuffer data, boolean isKeyFrame, long presentationTimeUs) {
-    dumpables.add(new DumpableSample(trackIndex, data, isKeyFrame, presentationTimeUs));
-    frameworkMuxer.writeSampleData(trackIndex, data, isKeyFrame, presentationTimeUs);
+      int trackIndex, ByteBuffer data, long presentationTimeUs, @C.BufferFlags int flags)
+      throws MuxerException {
+    dumpables.add(
+        new DumpableSample(
+            trackIndex,
+            data,
+            (flags & C.BUFFER_FLAG_KEY_FRAME) == C.BUFFER_FLAG_KEY_FRAME,
+            presentationTimeUs));
+    muxer.writeSampleData(trackIndex, data, presentationTimeUs, flags);
   }
 
   @Override
-  public void release(boolean forCancellation) {
+  public void addMetadata(Metadata metadata) {
+    dumpables.add(dumper -> dumper.add("container metadata", metadata));
+    muxer.addMetadata(metadata);
+  }
+
+  @Override
+  public void release(boolean forCancellation) throws MuxerException {
     dumpables.add(dumper -> dumper.add("released", true));
-    frameworkMuxer.release(forCancellation);
+    muxer.release(forCancellation);
+  }
+
+  @Override
+  public long getMaxDelayBetweenSamplesMs() {
+    return muxer.getMaxDelayBetweenSamplesMs();
   }
 
   // Dumper.Dumpable implementation.
@@ -82,6 +95,7 @@ public final class TestMuxer implements Muxer, Dumper.Dumpable {
     private final long presentationTimeUs;
     private final boolean isKeyFrame;
     private final int sampleDataHashCode;
+    private final int sampleSize;
 
     public DumpableSample(
         int trackIndex, ByteBuffer sample, boolean isKeyFrame, long presentationTimeUs) {
@@ -89,7 +103,8 @@ public final class TestMuxer implements Muxer, Dumper.Dumpable {
       this.presentationTimeUs = presentationTimeUs;
       this.isKeyFrame = isKeyFrame;
       int initialPosition = sample.position();
-      byte[] data = new byte[sample.remaining()];
+      sampleSize = sample.remaining();
+      byte[] data = new byte[sampleSize];
       sample.get(data);
       sample.position(initialPosition);
       sampleDataHashCode = Arrays.hashCode(data);
@@ -101,6 +116,7 @@ public final class TestMuxer implements Muxer, Dumper.Dumpable {
           .startBlock("sample")
           .add("trackIndex", trackIndex)
           .add("dataHashCode", sampleDataHashCode)
+          .add("size", sampleSize)
           .add("isKeyFrame", isKeyFrame)
           .add("presentationTimeUs", presentationTimeUs)
           .endBlock();

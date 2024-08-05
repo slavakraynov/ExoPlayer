@@ -44,7 +44,13 @@ import javax.crypto.spec.SecretKeySpec;
  * <p>Note that this {@link DataSource} does not support being opened from arbitrary offsets. It is
  * designed specifically for reading whole files as defined in an HLS media playlist. For this
  * reason the implementation is private to the HLS package.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ class Aes128DataSource implements DataSource {
 
   private final DataSource upstream;
@@ -96,9 +102,9 @@ import javax.crypto.spec.SecretKeySpec;
   }
 
   @Override
-  public final int read(byte[] buffer, int offset, int readLength) throws IOException {
+  public final int read(byte[] buffer, int offset, int length) throws IOException {
     Assertions.checkNotNull(cipherInputStream);
-    int bytesRead = cipherInputStream.read(buffer, offset, readLength);
+    int bytesRead = cipherInputStream.read(buffer, offset, length);
     if (bytesRead < 0) {
       return C.RESULT_END_OF_INPUT;
     }

@@ -30,11 +30,13 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer.InsufficientCapacityException;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmSession;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
+import com.google.android.exoplayer2.drm.DrmSessionEventListener.EventDispatcher;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.DrmSessionManager.DrmSessionReference;
 import com.google.android.exoplayer2.extractor.TrackOutput;
@@ -49,7 +51,15 @@ import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
-/** A queue of media samples. */
+/**
+ * A queue of media samples.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class SampleQueue implements TrackOutput {
 
   /** A listener for changes to the upstream format. */
@@ -71,14 +81,13 @@ public class SampleQueue implements TrackOutput {
   private final SpannedData<SharedSampleMetadata> sharedSampleMetadata;
   @Nullable private final DrmSessionManager drmSessionManager;
   @Nullable private final DrmSessionEventListener.EventDispatcher drmEventDispatcher;
-  @Nullable private final Looper playbackLooper;
   @Nullable private UpstreamFormatChangedListener upstreamFormatChangeListener;
 
   @Nullable private Format downstreamFormat;
   @Nullable private DrmSession currentDrmSession;
 
   private int capacity;
-  private int[] sourceIds;
+  private long[] sourceIds;
   private long[] offsets;
   private int[] sizes;
   private int[] flags;
@@ -99,7 +108,7 @@ public class SampleQueue implements TrackOutput {
   private boolean upstreamFormatAdjustmentRequired;
   @Nullable private Format unadjustedUpstreamFormat;
   @Nullable private Format upstreamFormat;
-  private int upstreamSourceId;
+  private long upstreamSourceId;
   private boolean upstreamAllSamplesAreSyncSamples;
   private boolean loggedUnexpectedNonSyncSample;
 
@@ -113,10 +122,7 @@ public class SampleQueue implements TrackOutput {
    */
   public static SampleQueue createWithoutDrm(Allocator allocator) {
     return new SampleQueue(
-        allocator,
-        /* playbackLooper= */ null,
-        /* drmSessionManager= */ null,
-        /* drmEventDispatcher= */ null);
+        allocator, /* drmSessionManager= */ null, /* drmEventDispatcher= */ null);
   }
 
   /**
@@ -126,7 +132,6 @@ public class SampleQueue implements TrackOutput {
    * keys needed to decrypt it.
    *
    * @param allocator An {@link Allocator} from which allocations for sample data can be obtained.
-   * @param playbackLooper The looper associated with the media playback thread.
    * @param drmSessionManager The {@link DrmSessionManager} to obtain {@link DrmSession DrmSessions}
    *     from. The created instance does not take ownership of this {@link DrmSessionManager}.
    * @param drmEventDispatcher A {@link DrmSessionEventListener.EventDispatcher} to notify of events
@@ -134,28 +139,42 @@ public class SampleQueue implements TrackOutput {
    */
   public static SampleQueue createWithDrm(
       Allocator allocator,
-      Looper playbackLooper,
       DrmSessionManager drmSessionManager,
       DrmSessionEventListener.EventDispatcher drmEventDispatcher) {
     return new SampleQueue(
         allocator,
-        Assertions.checkNotNull(playbackLooper),
+        Assertions.checkNotNull(drmSessionManager),
+        Assertions.checkNotNull(drmEventDispatcher));
+  }
+
+  /**
+   * @deprecated Use {@link #createWithDrm(Allocator, DrmSessionManager, EventDispatcher)} instead.
+   *     The {@code playbackLooper} should be configured on the {@link DrmSessionManager} with
+   *     {@link DrmSessionManager#setPlayer(Looper, PlayerId)}.
+   */
+  @Deprecated
+  public static SampleQueue createWithDrm(
+      Allocator allocator,
+      Looper playbackLooper,
+      DrmSessionManager drmSessionManager,
+      DrmSessionEventListener.EventDispatcher drmEventDispatcher) {
+    drmSessionManager.setPlayer(playbackLooper, PlayerId.UNSET);
+    return new SampleQueue(
+        allocator,
         Assertions.checkNotNull(drmSessionManager),
         Assertions.checkNotNull(drmEventDispatcher));
   }
 
   protected SampleQueue(
       Allocator allocator,
-      @Nullable Looper playbackLooper,
       @Nullable DrmSessionManager drmSessionManager,
       @Nullable DrmSessionEventListener.EventDispatcher drmEventDispatcher) {
-    this.playbackLooper = playbackLooper;
     this.drmSessionManager = drmSessionManager;
     this.drmEventDispatcher = drmEventDispatcher;
     sampleDataQueue = new SampleDataQueue(allocator);
     extrasHolder = new SampleExtrasHolder();
     capacity = SAMPLE_CAPACITY_INCREMENT;
-    sourceIds = new int[capacity];
+    sourceIds = new long[capacity];
     offsets = new long[capacity];
     timesUs = new long[capacity];
     flags = new int[capacity];
@@ -227,7 +246,7 @@ public class SampleQueue implements TrackOutput {
    *
    * @param sourceId The source identifier.
    */
-  public final void sourceId(int sourceId) {
+  public final void sourceId(long sourceId) {
     upstreamSourceId = sourceId;
   }
 
@@ -305,7 +324,7 @@ public class SampleQueue implements TrackOutput {
    *
    * @return The source id.
    */
-  public final synchronized int peekSourceId() {
+  public final synchronized long peekSourceId() {
     int relativeReadIndex = getRelativeIndex(readPosition);
     return hasNextSample() ? sourceIds[relativeReadIndex] : upstreamSourceId;
   }
@@ -562,10 +581,10 @@ public class SampleQueue implements TrackOutput {
   // TrackOutput implementation. Called by the loading thread.
 
   @Override
-  public final void format(Format unadjustedUpstreamFormat) {
-    Format adjustedUpstreamFormat = getAdjustedUpstreamFormat(unadjustedUpstreamFormat);
+  public final void format(Format format) {
+    Format adjustedUpstreamFormat = getAdjustedUpstreamFormat(format);
     upstreamFormatAdjustmentRequired = false;
-    this.unadjustedUpstreamFormat = unadjustedUpstreamFormat;
+    unadjustedUpstreamFormat = format;
     boolean upstreamFormatChanged = setUpstreamFormat(adjustedUpstreamFormat);
     if (upstreamFormatChangeListener != null && upstreamFormatChanged) {
       upstreamFormatChangeListener.onUpstreamFormatChanged(adjustedUpstreamFormat);
@@ -581,8 +600,8 @@ public class SampleQueue implements TrackOutput {
 
   @Override
   public final void sampleData(
-      ParsableByteArray buffer, int length, @SampleDataPart int sampleDataPart) {
-    sampleDataQueue.sampleData(buffer, length);
+      ParsableByteArray data, int length, @SampleDataPart int sampleDataPart) {
+    sampleDataQueue.sampleData(data, length);
   }
 
   @Override
@@ -703,6 +722,9 @@ public class SampleQueue implements TrackOutput {
     }
 
     buffer.setFlags(flags[relativeReadIndex]);
+    if (readPosition == (length - 1) && (loadingFinished || isLastSampleQueued)) {
+      buffer.addFlag(C.BUFFER_FLAG_LAST_SAMPLE);
+    }
     buffer.timeUs = timesUs[relativeReadIndex];
     if (buffer.timeUs < startTimeUs) {
       buffer.addFlag(C.BUFFER_FLAG_DECODE_ONLY);
@@ -741,26 +763,26 @@ public class SampleQueue implements TrackOutput {
   private synchronized long discardSampleMetadataTo(
       long timeUs, boolean toKeyframe, boolean stopAtReadPosition) {
     if (length == 0 || timeUs < timesUs[relativeFirstIndex]) {
-      return C.POSITION_UNSET;
+      return C.INDEX_UNSET;
     }
     int searchLength = stopAtReadPosition && readPosition != length ? readPosition + 1 : length;
     int discardCount = findSampleBefore(relativeFirstIndex, searchLength, timeUs, toKeyframe);
     if (discardCount == -1) {
-      return C.POSITION_UNSET;
+      return C.INDEX_UNSET;
     }
     return discardSamples(discardCount);
   }
 
   public synchronized long discardSampleMetadataToRead() {
     if (readPosition == 0) {
-      return C.POSITION_UNSET;
+      return C.INDEX_UNSET;
     }
     return discardSamples(readPosition);
   }
 
   private synchronized long discardSampleMetadataToEnd() {
     if (length == 0) {
-      return C.POSITION_UNSET;
+      return C.INDEX_UNSET;
     }
     return discardSamples(length);
   }
@@ -803,8 +825,7 @@ public class SampleQueue implements TrackOutput {
         || !sharedSampleMetadata.getEndValue().format.equals(upstreamFormat)) {
       DrmSessionReference drmSessionReference =
           drmSessionManager != null
-              ? drmSessionManager.preacquireSession(
-                  checkNotNull(playbackLooper), drmEventDispatcher, upstreamFormat)
+              ? drmSessionManager.preacquireSession(drmEventDispatcher, upstreamFormat)
               : DrmSessionReference.EMPTY;
 
       sharedSampleMetadata.appendSpan(
@@ -816,7 +837,7 @@ public class SampleQueue implements TrackOutput {
     if (length == capacity) {
       // Increase the capacity.
       int newCapacity = capacity + SAMPLE_CAPACITY_INCREMENT;
-      int[] newSourceIds = new int[newCapacity];
+      long[] newSourceIds = new long[newCapacity];
       long[] newOffsets = new long[newCapacity];
       long[] newTimesUs = new long[newCapacity];
       int[] newFlags = new int[newCapacity];
@@ -899,8 +920,7 @@ public class SampleQueue implements TrackOutput {
 
     outputFormatHolder.format =
         drmSessionManager != null
-            ? newFormat.copyWithExoMediaCryptoType(
-                drmSessionManager.getExoMediaCryptoType(newFormat))
+            ? newFormat.copyWithCryptoType(drmSessionManager.getCryptoType(newFormat))
             : newFormat;
     outputFormatHolder.drmSession = currentDrmSession;
     if (drmSessionManager == null) {
@@ -914,9 +934,7 @@ public class SampleQueue implements TrackOutput {
     // Ensure we acquire the new session before releasing the previous one in case the same session
     // is being used for both DrmInitData.
     @Nullable DrmSession previousSession = currentDrmSession;
-    currentDrmSession =
-        drmSessionManager.acquireSession(
-            Assertions.checkNotNull(playbackLooper), drmEventDispatcher, newFormat);
+    currentDrmSession = drmSessionManager.acquireSession(drmEventDispatcher, newFormat);
     outputFormatHolder.drmSession = currentDrmSession;
 
     if (previousSession != null) {

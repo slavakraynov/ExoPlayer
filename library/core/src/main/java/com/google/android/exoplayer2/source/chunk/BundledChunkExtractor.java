@@ -31,7 +31,6 @@ import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.mkv.MatroskaExtractor;
 import com.google.android.exoplayer2.extractor.mp4.FragmentedMp4Extractor;
-import com.google.android.exoplayer2.extractor.rawcc.RawCcExtractor;
 import com.google.android.exoplayer2.upstream.DataReader;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -42,7 +41,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 /**
  * {@link ChunkExtractor} implementation that uses ExoPlayer app-bundled {@link Extractor
  * Extractors}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtractor {
 
   /** {@link ChunkExtractor.Factory} for instances of this class. */
@@ -51,17 +56,13 @@ public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtrac
           format,
           enableEventMessageTrack,
           closedCaptionFormats,
-          playerEmsgTrackOutput) -> {
+          playerEmsgTrackOutput,
+          playerId) -> {
         @Nullable String containerMimeType = format.containerMimeType;
         Extractor extractor;
         if (MimeTypes.isText(containerMimeType)) {
-          if (MimeTypes.APPLICATION_RAWCC.equals(containerMimeType)) {
-            // RawCC is special because it's a text specific container format.
-            extractor = new RawCcExtractor(format);
-          } else {
-            // All other text types are raw formats that do not need an extractor.
-            return null;
-          }
+          // Text types do not need an extractor.
+          return null;
         } else if (MimeTypes.isMatroska(containerMimeType)) {
           extractor = new MatroskaExtractor(MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES);
         } else {
@@ -83,7 +84,7 @@ public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtrac
   private static final PositionHolder POSITION_HOLDER = new PositionHolder();
 
   private final Extractor extractor;
-  private final int primaryTrackType;
+  private final @C.TrackType int primaryTrackType;
   private final Format primaryTrackManifestFormat;
   private final SparseArray<BindingTrackOutput> bindingTrackOutputs;
 
@@ -97,13 +98,12 @@ public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtrac
    * Creates an instance.
    *
    * @param extractor The extractor to wrap.
-   * @param primaryTrackType The type of the primary track. Typically one of the {@link
-   *     com.google.android.exoplayer2.C} {@code TRACK_TYPE_*} constants.
+   * @param primaryTrackType The {@link C.TrackType type} of the primary track.
    * @param primaryTrackManifestFormat A manifest defined {@link Format} whose data should be merged
    *     into any sample {@link Format} output from the {@link Extractor} for the primary track.
    */
   public BundledChunkExtractor(
-      Extractor extractor, int primaryTrackType, Format primaryTrackManifestFormat) {
+      Extractor extractor, @C.TrackType int primaryTrackType, Format primaryTrackManifestFormat) {
     this.extractor = extractor;
     this.primaryTrackType = primaryTrackType;
     this.primaryTrackManifestFormat = primaryTrackManifestFormat;
@@ -164,8 +164,9 @@ public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtrac
       // Assert that if we're seeing a new track we have not seen endTracks.
       Assertions.checkState(sampleFormats == null);
       // TODO: Manifest formats for embedded tracks should also be passed here.
-      bindingTrackOutput = new BindingTrackOutput(id, type,
-          type == primaryTrackType ? primaryTrackManifestFormat : null);
+      bindingTrackOutput =
+          new BindingTrackOutput(
+              id, type, type == primaryTrackType ? primaryTrackManifestFormat : null);
       bindingTrackOutput.bind(trackOutputProvider, endTimeUs);
       bindingTrackOutputs.put(id, bindingTrackOutput);
     }

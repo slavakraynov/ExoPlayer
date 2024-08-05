@@ -22,14 +22,15 @@ import static org.mockito.Mockito.when;
 import android.net.Uri;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoaderFactory;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.MediaSourceEventListener;
-import com.google.android.exoplayer2.source.hls.playlist.HlsMasterPlaylist;
-import com.google.android.exoplayer2.source.hls.playlist.HlsMasterPlaylist.Rendition;
-import com.google.android.exoplayer2.source.hls.playlist.HlsMasterPlaylist.Variant;
+import com.google.android.exoplayer2.source.hls.playlist.HlsMultivariantPlaylist;
+import com.google.android.exoplayer2.source.hls.playlist.HlsMultivariantPlaylist.Rendition;
+import com.google.android.exoplayer2.source.hls.playlist.HlsMultivariantPlaylist.Variant;
 import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylist;
 import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylistTracker;
 import com.google.android.exoplayer2.testutil.MediaPeriodAsserts;
@@ -50,9 +51,9 @@ import org.junit.runner.RunWith;
 public final class HlsMediaPeriodTest {
 
   @Test
-  public void getSteamKeys_isCompatibleWithHlsMasterPlaylistFilter() {
-    HlsMasterPlaylist testMasterPlaylist =
-        createMasterPlaylist(
+  public void getSteamKeys_isCompatibleWithHlsMultivariantPlaylistFilter() {
+    HlsMultivariantPlaylist testMultivariantPlaylist =
+        createMultivariantPlaylist(
             /* variants= */ Arrays.asList(
                 createAudioOnlyVariant(/* peakBitrate= */ 10000),
                 createMuxedVideoAudioVariant(/* peakBitrate= */ 200000),
@@ -75,37 +76,41 @@ public final class HlsMediaPeriodTest {
           HlsDataSourceFactory mockDataSourceFactory = mock(HlsDataSourceFactory.class);
           when(mockDataSourceFactory.createDataSource(anyInt())).thenReturn(mock(DataSource.class));
           HlsPlaylistTracker mockPlaylistTracker = mock(HlsPlaylistTracker.class);
-          when(mockPlaylistTracker.getMasterPlaylist()).thenReturn((HlsMasterPlaylist) playlist);
+          when(mockPlaylistTracker.getMultivariantPlaylist())
+              .thenReturn((HlsMultivariantPlaylist) playlist);
           MediaPeriodId mediaPeriodId = new MediaPeriodId(/* periodUid= */ new Object());
           return new HlsMediaPeriod(
               mock(HlsExtractorFactory.class),
               mockPlaylistTracker,
               mockDataSourceFactory,
               mock(TransferListener.class),
+              /* cmcdConfiguration= */ null,
               mock(DrmSessionManager.class),
               new DrmSessionEventListener.EventDispatcher()
                   .withParameters(/* windowIndex= */ 0, mediaPeriodId),
               mock(LoadErrorHandlingPolicy.class),
               new MediaSourceEventListener.EventDispatcher()
-                  .withParameters(/* windowIndex= */ 0, mediaPeriodId, /* mediaTimeOffsetMs= */ 0),
+                  .withParameters(/* windowIndex= */ 0, mediaPeriodId),
               mock(Allocator.class),
               mock(CompositeSequenceableLoaderFactory.class),
               /* allowChunklessPreparation= */ true,
               HlsMediaSource.METADATA_TYPE_ID3,
-              /* useSessionKeys= */ false);
+              /* useSessionKeys= */ false,
+              PlayerId.UNSET,
+              /* timestampAdjusterInitializationTimeoutMs= */ 0);
         };
 
     MediaPeriodAsserts.assertGetStreamKeysAndManifestFilterIntegration(
-        mediaPeriodFactory, testMasterPlaylist);
+        mediaPeriodFactory, testMultivariantPlaylist);
   }
 
-  private static HlsMasterPlaylist createMasterPlaylist(
+  private static HlsMultivariantPlaylist createMultivariantPlaylist(
       List<Variant> variants,
       List<Rendition> audios,
       List<Rendition> subtitles,
       Format muxedAudioFormat,
       List<Format> muxedCaptionFormats) {
-    return new HlsMasterPlaylist(
+    return new HlsMultivariantPlaylist(
         "http://baseUri",
         /* tags= */ Collections.emptyList(),
         variants,

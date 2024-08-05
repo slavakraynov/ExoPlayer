@@ -24,7 +24,15 @@ import com.google.android.exoplayer2.metadata.id3.InternalFrame;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Holder for gapless playback information. */
+/**
+ * Holder for gapless playback information.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class GaplessInfoHolder {
 
   private static final String GAPLESS_DOMAIN = "com.apple.iTunes";
@@ -33,20 +41,18 @@ public final class GaplessInfoHolder {
       Pattern.compile("^ [0-9a-fA-F]{8} ([0-9a-fA-F]{8}) ([0-9a-fA-F]{8})");
 
   /**
-   * The number of samples to trim from the start of the decoded audio stream, or
-   * {@link Format#NO_VALUE} if not set.
+   * The number of samples to trim from the start of the decoded audio stream, or {@link
+   * Format#NO_VALUE} if not set.
    */
   public int encoderDelay;
 
   /**
-   * The number of samples to trim from the end of the decoded audio stream, or
-   * {@link Format#NO_VALUE} if not set.
+   * The number of samples to trim from the end of the decoded audio stream, or {@link
+   * Format#NO_VALUE} if not set.
    */
   public int encoderPadding;
 
-  /**
-   * Creates a new holder for gapless playback information.
-   */
+  /** Creates a new holder for gapless playback information. */
   public GaplessInfoHolder() {
     encoderDelay = Format.NO_VALUE;
     encoderPadding = Format.NO_VALUE;
@@ -121,11 +127,8 @@ public final class GaplessInfoHolder {
     return false;
   }
 
-  /**
-   * Returns whether {@link #encoderDelay} and {@link #encoderPadding} have been set.
-   */
+  /** Returns whether {@link #encoderDelay} and {@link #encoderPadding} have been set. */
   public boolean hasGaplessInfo() {
     return encoderDelay != Format.NO_VALUE && encoderPadding != Format.NO_VALUE;
   }
-
 }

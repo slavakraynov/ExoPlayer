@@ -17,7 +17,15 @@ package com.google.android.exoplayer2.extractor;
 
 import java.io.IOException;
 
-/** An overridable {@link ExtractorInput} implementation forwarding all methods to another input. */
+/**
+ * An overridable {@link ExtractorInput} implementation forwarding all methods to another input.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class ForwardingExtractorInput implements ExtractorInput {
 
   private final ExtractorInput input;
@@ -27,8 +35,8 @@ public class ForwardingExtractorInput implements ExtractorInput {
   }
 
   @Override
-  public int read(byte[] target, int offset, int length) throws IOException {
-    return input.read(target, offset, length);
+  public int read(byte[] buffer, int offset, int length) throws IOException {
+    return input.read(buffer, offset, length);
   }
 
   @Override

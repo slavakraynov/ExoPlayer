@@ -103,49 +103,50 @@ public final class VorbisUtilTest {
   @Test
   public void verifyVorbisHeaderCapturePattern_withValidHeader_returnsTrue()
       throws ParserException {
-    ParsableByteArray header = new ParsableByteArray(
-        new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
+    ParsableByteArray header =
+        new ParsableByteArray(new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
     assertThat(verifyVorbisHeaderCapturePattern(0x01, header, false)).isTrue();
   }
 
   @Test
   public void verifyVorbisHeaderCapturePattern_withValidHeader_returnsFalse() {
-    ParsableByteArray header = new ParsableByteArray(
-        new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
+    ParsableByteArray header =
+        new ParsableByteArray(new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
     try {
       VorbisUtil.verifyVorbisHeaderCapturePattern(0x99, header, false);
       fail();
     } catch (ParserException e) {
-      assertThat(e.getMessage()).isEqualTo("expected header type 99");
+      assertThat(e.getMessage())
+          .isEqualTo("expected header type 99{contentIsMalformed=true, dataType=1}");
     }
   }
 
   @Test
   public void verifyVorbisHeaderCapturePattern_withInvalidHeaderQuite_returnsFalse()
       throws ParserException {
-    ParsableByteArray header = new ParsableByteArray(
-        new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
+    ParsableByteArray header =
+        new ParsableByteArray(new byte[] {0x01, 'v', 'o', 'r', 'b', 'i', 's'});
     assertThat(verifyVorbisHeaderCapturePattern(0x99, header, true)).isFalse();
   }
 
   @Test
   public void verifyVorbisHeaderCapturePattern_withInvalidPattern_returnsFalse() {
-    ParsableByteArray header = new ParsableByteArray(
-        new byte[] {0x01, 'x', 'v', 'o', 'r', 'b', 'i', 's'});
+    ParsableByteArray header =
+        new ParsableByteArray(new byte[] {0x01, 'x', 'v', 'o', 'r', 'b', 'i', 's'});
     try {
       VorbisUtil.verifyVorbisHeaderCapturePattern(0x01, header, false);
       fail();
     } catch (ParserException e) {
-      assertThat(e.getMessage()).isEqualTo("expected characters 'vorbis'");
+      assertThat(e.getMessage())
+          .isEqualTo("expected characters 'vorbis'{contentIsMalformed=true, dataType=1}");
     }
   }
 
   @Test
   public void verifyVorbisHeaderCapturePatternQuite_withInvalidPatternQuite_returnsFalse()
       throws ParserException {
-    ParsableByteArray header = new ParsableByteArray(
-        new byte[] {0x01, 'x', 'v', 'o', 'r', 'b', 'i', 's'});
+    ParsableByteArray header =
+        new ParsableByteArray(new byte[] {0x01, 'x', 'v', 'o', 'r', 'b', 'i', 's'});
     assertThat(verifyVorbisHeaderCapturePattern(0x01, header, true)).isFalse();
   }
-
 }

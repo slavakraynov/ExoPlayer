@@ -22,11 +22,11 @@ import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import android.net.Uri;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.DrmSessionManagerProvider;
 import com.google.android.exoplayer2.source.BaseMediaSource;
 import com.google.android.exoplayer2.source.ForwardingTimeline;
@@ -35,12 +35,22 @@ import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSourceFactory;
 import com.google.android.exoplayer2.source.SinglePeriodTimeline;
 import com.google.android.exoplayer2.upstream.Allocator;
-import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Util;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
+import javax.net.SocketFactory;
 
-/** An Rtsp {@link MediaSource} */
+/**
+ * An Rtsp {@link MediaSource}
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class RtspMediaSource extends BaseMediaSource {
 
   static {
@@ -57,21 +67,22 @@ public final class RtspMediaSource extends BaseMediaSource {
    *
    * <ul>
    *   <li>{@link #setDrmSessionManagerProvider(DrmSessionManagerProvider)}
-   *   <li>{@link #setDrmSessionManager(DrmSessionManager)}
-   *   <li>{@link #setDrmHttpDataSourceFactory(HttpDataSource.Factory)}
-   *   <li>{@link #setDrmUserAgent(String)}
    *   <li>{@link #setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy)}
    * </ul>
    */
+  @SuppressWarnings("deprecation") // Implement deprecated type for backwards compatibility.
   public static final class Factory implements MediaSourceFactory {
 
     private long timeoutMs;
     private String userAgent;
+    private SocketFactory socketFactory;
     private boolean forceUseRtpTcp;
+    private boolean debugLoggingEnabled;
 
     public Factory() {
       timeoutMs = DEFAULT_TIMEOUT_MS;
       userAgent = ExoPlayerLibraryInfo.VERSION_SLASHY;
+      socketFactory = SocketFactory.getDefault();
     }
 
     /**
@@ -85,6 +96,7 @@ public final class RtspMediaSource extends BaseMediaSource {
      * @param forceUseRtpTcp Whether force to use TCP for streaming.
      * @return This Factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setForceUseRtpTcp(boolean forceUseRtpTcp) {
       this.forceUseRtpTcp = forceUseRtpTcp;
       return this;
@@ -96,8 +108,37 @@ public final class RtspMediaSource extends BaseMediaSource {
      * @param userAgent The user agent.
      * @return This Factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setUserAgent(String userAgent) {
       this.userAgent = userAgent;
+      return this;
+    }
+
+    /**
+     * Sets a socket factory for {@link RtspClient}'s connection, the default value is {@link
+     * SocketFactory#getDefault()}.
+     *
+     * @param socketFactory A socket factory.
+     * @return This Factory, for convenience.
+     */
+    @CanIgnoreReturnValue
+    public Factory setSocketFactory(SocketFactory socketFactory) {
+      this.socketFactory = socketFactory;
+      return this;
+    }
+
+    /**
+     * Sets whether to log RTSP messages, the default value is {@code false}.
+     *
+     * <p>This option presents a privacy risk, since it may expose sensitive information such as
+     * user's credentials.
+     *
+     * @param debugLoggingEnabled Whether to log RTSP messages.
+     * @return This Factory, for convenience.
+     */
+    @CanIgnoreReturnValue
+    public Factory setDebugLoggingEnabled(boolean debugLoggingEnabled) {
+      this.debugLoggingEnabled = debugLoggingEnabled;
       return this;
     }
 
@@ -110,6 +151,7 @@ public final class RtspMediaSource extends BaseMediaSource {
      * @param timeoutMs The timeout measured in milliseconds.
      * @return This Factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setTimeoutMs(@IntRange(from = 1) long timeoutMs) {
       checkArgument(timeoutMs > 0);
       this.timeoutMs = timeoutMs;
@@ -118,56 +160,20 @@ public final class RtspMediaSource extends BaseMediaSource {
 
     /** Does nothing. {@link RtspMediaSource} does not support DRM. */
     @Override
-    public Factory setDrmSessionManagerProvider(
-        @Nullable DrmSessionManagerProvider drmSessionManager) {
-      return this;
-    }
-
-    /**
-     * Does nothing. {@link RtspMediaSource} does not support DRM.
-     *
-     * @deprecated {@link RtspMediaSource} does not support DRM.
-     */
-    @Deprecated
-    @Override
-    public Factory setDrmSessionManager(@Nullable DrmSessionManager drmSessionManager) {
-      return this;
-    }
-
-    /**
-     * Does nothing. {@link RtspMediaSource} does not support DRM.
-     *
-     * @deprecated {@link RtspMediaSource} does not support DRM.
-     */
-    @Deprecated
-    @Override
-    public Factory setDrmHttpDataSourceFactory(
-        @Nullable HttpDataSource.Factory drmHttpDataSourceFactory) {
-      return this;
-    }
-
-    /**
-     * Does nothing. {@link RtspMediaSource} does not support DRM.
-     *
-     * @deprecated {@link RtspMediaSource} does not support DRM.
-     */
-    @Deprecated
-    @Override
-    public Factory setDrmUserAgent(@Nullable String userAgent) {
+    public Factory setDrmSessionManagerProvider(DrmSessionManagerProvider drmSessionManager) {
       return this;
     }
 
     /** Does nothing. {@link RtspMediaSource} does not support error handling policies. */
     @Override
-    public Factory setLoadErrorHandlingPolicy(
-        @Nullable LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
+    public Factory setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
       // TODO(internal b/172331505): Implement support.
       return this;
     }
 
     @Override
-    public int[] getSupportedTypes() {
-      return new int[] {C.TYPE_RTSP};
+    public @C.ContentType int[] getSupportedTypes() {
+      return new int[] {C.CONTENT_TYPE_RTSP};
     }
 
     /**
@@ -175,22 +181,24 @@ public final class RtspMediaSource extends BaseMediaSource {
      *
      * @param mediaItem The {@link MediaItem}.
      * @return The new {@link RtspMediaSource}.
-     * @throws NullPointerException if {@link MediaItem#playbackProperties} is {@code null}.
+     * @throws NullPointerException if {@link MediaItem#localConfiguration} is {@code null}.
      */
     @Override
     public RtspMediaSource createMediaSource(MediaItem mediaItem) {
-      checkNotNull(mediaItem.playbackProperties);
+      checkNotNull(mediaItem.localConfiguration);
       return new RtspMediaSource(
           mediaItem,
           forceUseRtpTcp
               ? new TransferRtpDataChannelFactory(timeoutMs)
               : new UdpDataSourceRtpDataChannelFactory(timeoutMs),
-          userAgent);
+          userAgent,
+          socketFactory,
+          debugLoggingEnabled);
     }
   }
 
   /** Thrown when an exception or error is encountered during loading an RTSP stream. */
-  public static final class RtspPlaybackException extends IOException {
+  public static class RtspPlaybackException extends IOException {
     public RtspPlaybackException(String message) {
       super(message);
     }
@@ -204,22 +212,38 @@ public final class RtspMediaSource extends BaseMediaSource {
     }
   }
 
+  /** Thrown when an RTSP Unsupported Transport error (461) is encountered during RTSP Setup. */
+  public static final class RtspUdpUnsupportedTransportException extends RtspPlaybackException {
+    public RtspUdpUnsupportedTransportException(String message) {
+      super(message);
+    }
+  }
+
   private final MediaItem mediaItem;
   private final RtpDataChannel.Factory rtpDataChannelFactory;
   private final String userAgent;
   private final Uri uri;
+  private final SocketFactory socketFactory;
+  private final boolean debugLoggingEnabled;
 
   private long timelineDurationUs;
   private boolean timelineIsSeekable;
   private boolean timelineIsLive;
   private boolean timelineIsPlaceholder;
 
-  private RtspMediaSource(
-      MediaItem mediaItem, RtpDataChannel.Factory rtpDataChannelFactory, String userAgent) {
+  @VisibleForTesting
+  /* package */ RtspMediaSource(
+      MediaItem mediaItem,
+      RtpDataChannel.Factory rtpDataChannelFactory,
+      String userAgent,
+      SocketFactory socketFactory,
+      boolean debugLoggingEnabled) {
     this.mediaItem = mediaItem;
     this.rtpDataChannelFactory = rtpDataChannelFactory;
     this.userAgent = userAgent;
-    this.uri = checkNotNull(this.mediaItem.playbackProperties).uri;
+    this.uri = checkNotNull(this.mediaItem.localConfiguration).uri;
+    this.socketFactory = socketFactory;
+    this.debugLoggingEnabled = debugLoggingEnabled;
     this.timelineDurationUs = C.TIME_UNSET;
     this.timelineIsPlaceholder = true;
   }
@@ -250,14 +274,25 @@ public final class RtspMediaSource extends BaseMediaSource {
         allocator,
         rtpDataChannelFactory,
         uri,
-        (timing) -> {
-          timelineDurationUs = C.msToUs(timing.getDurationMs());
-          timelineIsSeekable = !timing.isLive();
-          timelineIsLive = timing.isLive();
-          timelineIsPlaceholder = false;
-          notifySourceInfoRefreshed();
+        new RtspMediaPeriod.Listener() {
+          @Override
+          public void onSourceInfoRefreshed(RtspSessionTiming timing) {
+            timelineDurationUs = Util.msToUs(timing.getDurationMs());
+            timelineIsSeekable = !timing.isLive();
+            timelineIsLive = timing.isLive();
+            timelineIsPlaceholder = false;
+            notifySourceInfoRefreshed();
+          }
+
+          @Override
+          public void onSeekingUnsupported() {
+            timelineIsSeekable = false;
+            notifySourceInfoRefreshed();
+          }
         },
-        userAgent);
+        userAgent,
+        socketFactory,
+        debugLoggingEnabled);
   }
 
   @Override

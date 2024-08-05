@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.extractor.mkv;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import com.google.android.exoplayer2.C;
@@ -26,17 +27,25 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayDeque;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
 /**
  * Default implementation of {@link EbmlReader}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class DefaultEbmlReader implements EbmlReader {
 
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({ELEMENT_STATE_READ_ID, ELEMENT_STATE_READ_CONTENT_SIZE, ELEMENT_STATE_READ_CONTENT})
   private @interface ElementState {}
 
@@ -117,7 +126,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           return true;
         case EbmlProcessor.ELEMENT_TYPE_UNSIGNED_INT:
           if (elementContentSize > MAX_INTEGER_ELEMENT_SIZE_BYTES) {
-            throw new ParserException("Invalid integer size: " + elementContentSize);
+            throw ParserException.createForMalformedContainer(
+                "Invalid integer size: " + elementContentSize, /* cause= */ null);
           }
           processor.integerElement(elementId, readInteger(input, (int) elementContentSize));
           elementState = ELEMENT_STATE_READ_ID;
@@ -125,14 +135,16 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         case EbmlProcessor.ELEMENT_TYPE_FLOAT:
           if (elementContentSize != VALID_FLOAT32_ELEMENT_SIZE_BYTES
               && elementContentSize != VALID_FLOAT64_ELEMENT_SIZE_BYTES) {
-            throw new ParserException("Invalid float size: " + elementContentSize);
+            throw ParserException.createForMalformedContainer(
+                "Invalid float size: " + elementContentSize, /* cause= */ null);
           }
           processor.floatElement(elementId, readFloat(input, (int) elementContentSize));
           elementState = ELEMENT_STATE_READ_ID;
           return true;
         case EbmlProcessor.ELEMENT_TYPE_STRING:
           if (elementContentSize > Integer.MAX_VALUE) {
-            throw new ParserException("String element size: " + elementContentSize);
+            throw ParserException.createForMalformedContainer(
+                "String element size: " + elementContentSize, /* cause= */ null);
           }
           processor.stringElement(elementId, readString(input, (int) elementContentSize));
           elementState = ELEMENT_STATE_READ_ID;
@@ -146,7 +158,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           elementState = ELEMENT_STATE_READ_ID;
           break;
         default:
-          throw new ParserException("Invalid element type " + type);
+          throw ParserException.createForMalformedContainer(
+              "Invalid element type " + type, /* cause= */ null);
       }
     }
   }
@@ -250,7 +263,5 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       this.elementId = elementId;
       this.elementEndPosition = elementEndPosition;
     }
-
   }
-
 }

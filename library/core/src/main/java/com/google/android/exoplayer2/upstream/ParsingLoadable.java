@@ -32,12 +32,15 @@ import java.util.Map;
  * A {@link Loadable} for objects that can be parsed from binary data using a {@link Parser}.
  *
  * @param <T> The type of the object being loaded.
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class ParsingLoadable<T> implements Loadable {
 
-  /**
-   * Parses an object from loaded data.
-   */
+  /** Parses an object from loaded data. */
   public interface Parser<T> {
 
     /**
@@ -50,7 +53,6 @@ public final class ParsingLoadable<T> implements Loadable {
      * @throws IOException If an error occurs reading data from the stream.
      */
     T parse(Uri uri, InputStream inputStream) throws IOException;
-
   }
 
   /**
@@ -101,7 +103,7 @@ public final class ParsingLoadable<T> implements Loadable {
   private final StatsDataSource dataSource;
   private final Parser<? extends T> parser;
 
-  private volatile @Nullable T result;
+  @Nullable private volatile T result;
 
   /**
    * @param dataSource A {@link DataSource} to use when loading the data.
@@ -123,8 +125,8 @@ public final class ParsingLoadable<T> implements Loadable {
    * @param type See {@link #type}.
    * @param parser Parses the object from the response.
    */
-  public ParsingLoadable(DataSource dataSource, DataSpec dataSpec, int type,
-      Parser<? extends T> parser) {
+  public ParsingLoadable(
+      DataSource dataSource, DataSpec dataSpec, int type, Parser<? extends T> parser) {
     this.dataSource = new StatsDataSource(dataSource);
     this.dataSpec = dataSpec;
     this.type = type;

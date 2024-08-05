@@ -22,6 +22,7 @@ import android.util.SparseBooleanArray;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.util.Util;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.EOFException;
 import java.io.IOException;
 
@@ -48,15 +49,12 @@ import java.io.IOException;
  */
 public final class FakeExtractorInput implements ExtractorInput {
 
-  /**
-   * Thrown when simulating an {@link IOException}.
-   */
+  /** Thrown when simulating an {@link IOException}. */
   public static final class SimulatedIOException extends IOException {
 
     public SimulatedIOException(String message) {
       super(message);
     }
-
   }
 
   private final byte[] data;
@@ -72,8 +70,11 @@ public final class FakeExtractorInput implements ExtractorInput {
   private final SparseBooleanArray failedReadPositions;
   private final SparseBooleanArray failedPeekPositions;
 
-  private FakeExtractorInput(byte[] data, boolean simulateUnknownLength,
-      boolean simulatePartialReads, boolean simulateIOErrors) {
+  private FakeExtractorInput(
+      byte[] data,
+      boolean simulateUnknownLength,
+      boolean simulatePartialReads,
+      boolean simulateIOErrors) {
     this.data = data;
     this.simulateUnknownLength = simulateUnknownLength;
     this.simulatePartialReads = simulatePartialReads;
@@ -100,17 +101,17 @@ public final class FakeExtractorInput implements ExtractorInput {
    * @param position The position to set.
    */
   public void setPosition(int position) {
-    assertThat(0 <= position).isTrue();
-    assertThat(position <= data.length).isTrue();
+    assertThat(position).isAtLeast(0);
+    assertThat(position).isAtMost(data.length);
     readPosition = position;
     peekPosition = position;
   }
 
   @Override
-  public int read(byte[] target, int offset, int length) throws IOException {
+  public int read(byte[] buffer, int offset, int length) throws IOException {
     checkIOException(readPosition, failedReadPositions);
     length = getLengthToRead(readPosition, length, partiallySatisfiedTargetReadPositions);
-    return readFullyInternal(target, offset, length, true) ? length : C.RESULT_END_OF_INPUT;
+    return readFullyInternal(buffer, offset, length, true) ? length : C.RESULT_END_OF_INPUT;
   }
 
   @Override
@@ -222,8 +223,13 @@ public final class FakeExtractorInput implements ExtractorInput {
       throw new EOFException();
     }
     if (position + length > data.length) {
-      throw new EOFException("Attempted to move past end of data: (" + position + " + "
-          + length + ") > " + data.length);
+      throw new EOFException(
+          "Attempted to move past end of data: ("
+              + position
+              + " + "
+              + length
+              + ") > "
+              + data.length);
     }
     return true;
   }
@@ -235,7 +241,8 @@ public final class FakeExtractorInput implements ExtractorInput {
       return requestedLength == 0 ? 0 : Integer.MAX_VALUE;
     }
     int targetPosition = position + requestedLength;
-    if (simulatePartialReads && requestedLength > 1
+    if (simulatePartialReads
+        && requestedLength > 1
         && !partiallySatisfiedTargetPositions.get(targetPosition)) {
       partiallySatisfiedTargetPositions.put(targetPosition, true);
       return 1;
@@ -273,9 +280,7 @@ public final class FakeExtractorInput implements ExtractorInput {
     return true;
   }
 
-  /**
-   * Builder of {@link FakeExtractorInput} instances.
-   */
+  /** Builder of {@link FakeExtractorInput} instances. */
   public static final class Builder {
 
     private byte[] data;
@@ -287,31 +292,33 @@ public final class FakeExtractorInput implements ExtractorInput {
       data = Util.EMPTY_BYTE_ARRAY;
     }
 
+    @CanIgnoreReturnValue
     public Builder setData(byte[] data) {
       this.data = data;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setSimulateUnknownLength(boolean simulateUnknownLength) {
       this.simulateUnknownLength = simulateUnknownLength;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setSimulatePartialReads(boolean simulatePartialReads) {
       this.simulatePartialReads = simulatePartialReads;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setSimulateIOErrors(boolean simulateIOErrors) {
       this.simulateIOErrors = simulateIOErrors;
       return this;
     }
 
     public FakeExtractorInput build() {
-      return new FakeExtractorInput(data, simulateUnknownLength, simulatePartialReads,
-          simulateIOErrors);
+      return new FakeExtractorInput(
+          data, simulateUnknownLength, simulatePartialReads, simulateIOErrors);
     }
-
   }
-
 }

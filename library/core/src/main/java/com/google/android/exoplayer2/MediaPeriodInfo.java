@@ -18,9 +18,18 @@ package com.google.android.exoplayer2;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
+import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 
-/** Stores the information required to load and play a {@link MediaPeriod}. */
+/**
+ * Stores the information required to load and play a {@link MediaPeriod}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class MediaPeriodInfo {
 
   /** The media period's identifier. */
@@ -37,9 +46,10 @@ import com.google.android.exoplayer2.util.Util;
   public final long requestedContentPositionUs;
   /**
    * The end position to which the media period's content is clipped in order to play a following ad
-   * group, in microseconds, or {@link C#TIME_UNSET} if there is no following ad group or if this
-   * media period is an ad. The value {@link C#TIME_END_OF_SOURCE} indicates that a postroll ad
-   * follows at the end of this content media period.
+   * group or to terminate a server side ad inserted stream before a played postroll, in
+   * microseconds, or {@link C#TIME_UNSET} if the content is not clipped or if this media period is
+   * an ad. The value {@link C#TIME_END_OF_SOURCE} indicates that a postroll ad follows at the end
+   * of this content media period.
    */
   public final long endPositionUs;
   /**
@@ -48,6 +58,12 @@ import com.google.android.exoplayer2.util.Util;
    * known.
    */
   public final long durationUs;
+  /**
+   * Whether this media period is followed by a transition to another media period of the same
+   * server-side inserted ad stream. If true, {@link #isLastInTimelinePeriod}, {@link
+   * #isLastInTimelineWindow} and {@link #isFinal} will all be false.
+   */
+  public final boolean isFollowedByTransitionToSameStream;
   /**
    * Whether this is the last media period in its timeline period (e.g., a postroll ad, or a media
    * period corresponding to a timeline period without ads).
@@ -67,14 +83,21 @@ import com.google.android.exoplayer2.util.Util;
       long requestedContentPositionUs,
       long endPositionUs,
       long durationUs,
+      boolean isFollowedByTransitionToSameStream,
       boolean isLastInTimelinePeriod,
       boolean isLastInTimelineWindow,
       boolean isFinal) {
+    Assertions.checkArgument(!isFinal || isLastInTimelinePeriod);
+    Assertions.checkArgument(!isLastInTimelineWindow || isLastInTimelinePeriod);
+    Assertions.checkArgument(
+        !isFollowedByTransitionToSameStream
+            || (!isLastInTimelinePeriod && !isLastInTimelineWindow && !isFinal));
     this.id = id;
     this.startPositionUs = startPositionUs;
     this.requestedContentPositionUs = requestedContentPositionUs;
     this.endPositionUs = endPositionUs;
     this.durationUs = durationUs;
+    this.isFollowedByTransitionToSameStream = isFollowedByTransitionToSameStream;
     this.isLastInTimelinePeriod = isLastInTimelinePeriod;
     this.isLastInTimelineWindow = isLastInTimelineWindow;
     this.isFinal = isFinal;
@@ -93,6 +116,7 @@ import com.google.android.exoplayer2.util.Util;
             requestedContentPositionUs,
             endPositionUs,
             durationUs,
+            isFollowedByTransitionToSameStream,
             isLastInTimelinePeriod,
             isLastInTimelineWindow,
             isFinal);
@@ -111,6 +135,7 @@ import com.google.android.exoplayer2.util.Util;
             requestedContentPositionUs,
             endPositionUs,
             durationUs,
+            isFollowedByTransitionToSameStream,
             isLastInTimelinePeriod,
             isLastInTimelineWindow,
             isFinal);
@@ -129,6 +154,7 @@ import com.google.android.exoplayer2.util.Util;
         && requestedContentPositionUs == that.requestedContentPositionUs
         && endPositionUs == that.endPositionUs
         && durationUs == that.durationUs
+        && isFollowedByTransitionToSameStream == that.isFollowedByTransitionToSameStream
         && isLastInTimelinePeriod == that.isLastInTimelinePeriod
         && isLastInTimelineWindow == that.isLastInTimelineWindow
         && isFinal == that.isFinal
@@ -143,6 +169,7 @@ import com.google.android.exoplayer2.util.Util;
     result = 31 * result + (int) requestedContentPositionUs;
     result = 31 * result + (int) endPositionUs;
     result = 31 * result + (int) durationUs;
+    result = 31 * result + (isFollowedByTransitionToSameStream ? 1 : 0);
     result = 31 * result + (isLastInTimelinePeriod ? 1 : 0);
     result = 31 * result + (isLastInTimelineWindow ? 1 : 0);
     result = 31 * result + (isFinal ? 1 : 0);

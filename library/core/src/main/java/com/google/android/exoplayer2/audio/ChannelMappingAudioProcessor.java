@@ -17,13 +17,21 @@ package com.google.android.exoplayer2.audio;
 
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.nio.ByteBuffer;
 
 /**
  * An {@link AudioProcessor} that applies a mapping from input channels onto specified output
  * channels. This can be used to reorder, duplicate or discard channels.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class ChannelMappingAudioProcessor extends BaseAudioProcessor {
 
   @Nullable private int[] pendingOutputChannels;
@@ -33,15 +41,17 @@ import java.nio.ByteBuffer;
    * Resets the channel mapping. After calling this method, call {@link #configure(AudioFormat)} to
    * start using the new channel map.
    *
+   * <p>See {@link AudioSink#configure(Format, int, int[])}.
+   *
    * @param outputChannels The mapping from input to output channel indices, or {@code null} to
    *     leave the input unchanged.
-   * @see AudioSink#configure(com.google.android.exoplayer2.Format, int, int[])
    */
   public void setChannelMap(@Nullable int[] outputChannels) {
     pendingOutputChannels = outputChannels;
   }
 
   @Override
+  @CanIgnoreReturnValue
   public AudioFormat onConfigure(AudioFormat inputAudioFormat)
       throws UnhandledAudioFormatException {
     @Nullable int[] outputChannels = pendingOutputChannels;
@@ -94,5 +104,4 @@ import java.nio.ByteBuffer;
     outputChannels = null;
     pendingOutputChannels = null;
   }
-
 }

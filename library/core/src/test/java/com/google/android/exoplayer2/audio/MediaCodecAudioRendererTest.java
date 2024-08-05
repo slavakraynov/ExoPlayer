@@ -18,11 +18,13 @@ package com.google.android.exoplayer2.audio;
 import static com.google.android.exoplayer2.testutil.FakeSampleStream.FakeSampleStreamItem.END_OF_STREAM_ITEM;
 import static com.google.android.exoplayer2.testutil.FakeSampleStream.FakeSampleStreamItem.format;
 import static com.google.android.exoplayer2.testutil.FakeSampleStream.FakeSampleStreamItem.oneByteSample;
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.robolectric.Shadows.shadowOf;
@@ -37,7 +39,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.PlaybackException;
+import com.google.android.exoplayer2.RendererCapabilities;
+import com.google.android.exoplayer2.RendererCapabilities.Capabilities;
 import com.google.android.exoplayer2.RendererConfiguration;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
@@ -52,13 +58,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
-import org.robolectric.annotation.Config;
 
 /** Unit tests for {@link MediaCodecAudioRenderer} */
-@Config(sdk = 29)
 @RunWith(AndroidJUnit4.class)
 public class MediaCodecAudioRendererTest {
   @Rule public final MockitoRule mockito = MockitoJUnit.rule();
@@ -78,14 +83,21 @@ public class MediaCodecAudioRendererTest {
 
   @Mock private AudioSink audioSink;
   @Mock private AudioRendererEventListener audioRendererEventListener;
+  @Mock private RendererCapabilities.Listener rendererCapabilitiesListener;
 
   @Before
   public void setUp() throws Exception {
     // audioSink isEnded can always be true because the MediaCodecAudioRenderer isEnded =
     // super.isEnded && audioSink.isEnded.
     when(audioSink.isEnded()).thenReturn(true);
-
     when(audioSink.handleBuffer(any(), anyLong(), anyInt())).thenReturn(true);
+    when(audioSink.supportsFormat(any()))
+        .thenAnswer(
+            invocation -> {
+              Format format = invocation.getArgument(/* index= */ 0, Format.class);
+              return MimeTypes.AUDIO_RAW.equals(format.sampleMimeType)
+                  && format.pcmEncoding == C.ENCODING_PCM_16BIT;
+            });
 
     mediaCodecSelector =
         (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) ->
@@ -111,6 +123,7 @@ public class MediaCodecAudioRendererTest {
             eventHandler,
             audioRendererEventListener,
             audioSink);
+    mediaCodecAudioRenderer.init(/* index= */ 0, PlayerId.UNSET);
   }
 
   @Test
@@ -143,7 +156,7 @@ public class MediaCodecAudioRendererTest {
         /* joining= */ false,
         /* mayRenderStartOfStream= */ false,
         /* startPositionUs= */ 0,
-        /* offsetUs */ 0);
+        /* offsetUs= */ 0);
 
     mediaCodecAudioRenderer.start();
     mediaCodecAudioRenderer.render(/* positionUs= */ 0, SystemClock.elapsedRealtime() * 1000);
@@ -200,7 +213,7 @@ public class MediaCodecAudioRendererTest {
         /* joining= */ false,
         /* mayRenderStartOfStream= */ false,
         /* startPositionUs= */ 0,
-        /* offsetUs */ 0);
+        /* offsetUs= */ 0);
 
     mediaCodecAudioRenderer.start();
     mediaCodecAudioRenderer.render(/* positionUs= */ 0, SystemClock.elapsedRealtime() * 1000);
@@ -245,7 +258,9 @@ public class MediaCodecAudioRendererTest {
                       "rendererName",
                       /* rendererIndex= */ 0,
                       format,
-                      C.FORMAT_HANDLED));
+                      C.FORMAT_HANDLED,
+                      /* isRecoverable= */ false,
+                      PlaybackException.ERROR_CODE_UNSPECIFIED));
             }
           }
         };
@@ -263,6 +278,7 @@ public class MediaCodecAudioRendererTest {
                 oneByteSample(/* timeUs= */ 0, C.BUFFER_FLAG_KEY_FRAME), END_OF_STREAM_ITEM));
     fakeSampleStream.writeData(/* startPositionUs= */ 0);
 
+    exceptionThrowingRenderer.init(/* index= */ 0, PlayerId.UNSET);
     exceptionThrowingRenderer.enable(
         RendererConfiguration.DEFAULT,
         new Format[] {AUDIO_AAC, changedFormat},
@@ -271,7 +287,7 @@ public class MediaCodecAudioRendererTest {
         /* joining= */ false,
         /* mayRenderStartOfStream= */ false,
         /* startPositionUs= */ 0,
-        /* offsetUs */ 0);
+        /* offsetUs= */ 0);
 
     exceptionThrowingRenderer.start();
     exceptionThrowingRenderer.render(/* positionUs= */ 0, SystemClock.elapsedRealtime() * 1000);
@@ -309,6 +325,113 @@ public class MediaCodecAudioRendererTest {
 
     shadowOf(Looper.getMainLooper()).idle();
     verify(audioRendererEventListener).onAudioSinkError(error);
+  }
+
+  @Test
+  public void
+      renderer_callsRendererCapabilitiesListener_whenAudioSinkListenerOnAudioCapabilitiesChangedIsCalled() {
+    final ArgumentCaptor<AudioSink.Listener> listenerCaptor =
+        ArgumentCaptor.forClass(AudioSink.Listener.class);
+    verify(audioSink, atLeastOnce()).setListener(listenerCaptor.capture());
+    AudioSink.Listener audioSinkListener = listenerCaptor.getValue();
+    mediaCodecAudioRenderer.getCapabilities().setListener(rendererCapabilitiesListener);
+
+    audioSinkListener.onAudioCapabilitiesChanged();
+
+    shadowOf(Looper.getMainLooper()).idle();
+    verify(rendererCapabilitiesListener).onRendererCapabilitiesChanged(mediaCodecAudioRenderer);
+  }
+
+  @Test
+  public void render_callsAudioSinkSetOutputStreamOffset_whenReplaceStream() throws Exception {
+    FakeSampleStream fakeSampleStream1 =
+        new FakeSampleStream(
+            new DefaultAllocator(/* trimOnReset= */ true, /* individualAllocationSize= */ 1024),
+            /* mediaSourceEventDispatcher= */ null,
+            DrmSessionManager.DRM_UNSUPPORTED,
+            new DrmSessionEventListener.EventDispatcher(),
+            AUDIO_AAC,
+            ImmutableList.of(
+                oneByteSample(/* timeUs= */ 0, C.BUFFER_FLAG_KEY_FRAME),
+                oneByteSample(/* timeUs= */ 1_000),
+                END_OF_STREAM_ITEM));
+    fakeSampleStream1.writeData(/* startPositionUs= */ 0);
+    FakeSampleStream fakeSampleStream2 =
+        new FakeSampleStream(
+            new DefaultAllocator(/* trimOnReset= */ true, /* individualAllocationSize= */ 1024),
+            /* mediaSourceEventDispatcher= */ null,
+            DrmSessionManager.DRM_UNSUPPORTED,
+            new DrmSessionEventListener.EventDispatcher(),
+            AUDIO_AAC,
+            ImmutableList.of(
+                oneByteSample(/* timeUs= */ 1_000_000, C.BUFFER_FLAG_KEY_FRAME),
+                oneByteSample(/* timeUs= */ 1_001_000),
+                END_OF_STREAM_ITEM));
+    fakeSampleStream2.writeData(/* startPositionUs= */ 0);
+    mediaCodecAudioRenderer.enable(
+        RendererConfiguration.DEFAULT,
+        new Format[] {AUDIO_AAC},
+        fakeSampleStream1,
+        /* positionUs= */ 0,
+        /* joining= */ false,
+        /* mayRenderStartOfStream= */ true,
+        /* startPositionUs= */ 0,
+        /* offsetUs= */ 0);
+
+    mediaCodecAudioRenderer.start();
+    while (!mediaCodecAudioRenderer.hasReadStreamToEnd()) {
+      mediaCodecAudioRenderer.render(/* positionUs= */ 0, /* elapsedRealtimeUs= */ 0);
+    }
+    mediaCodecAudioRenderer.replaceStream(
+        new Format[] {AUDIO_AAC},
+        fakeSampleStream2,
+        /* startPositionUs= */ 1_000_000,
+        /* offsetUs= */ 1_000_000);
+    mediaCodecAudioRenderer.setCurrentStreamFinal();
+    while (!mediaCodecAudioRenderer.isEnded()) {
+      mediaCodecAudioRenderer.render(/* positionUs= */ 0, /* elapsedRealtimeUs= */ 0);
+    }
+
+    InOrder inOrderAudioSink = inOrder(audioSink);
+    inOrderAudioSink.verify(audioSink).setOutputStreamOffsetUs(0);
+    inOrderAudioSink.verify(audioSink).setOutputStreamOffsetUs(1_000_000);
+  }
+
+  @Test
+  public void supportsFormat_withEac3JocMediaAndEac3Decoder_returnsTrue() throws Exception {
+    Format mediaFormat =
+        new Format.Builder()
+            .setSampleMimeType(MimeTypes.AUDIO_E_AC3_JOC)
+            .setCodecs(MimeTypes.CODEC_E_AC3_JOC)
+            .build();
+    MediaCodecSelector mediaCodecSelector =
+        (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) ->
+            !mimeType.equals(MimeTypes.AUDIO_E_AC3)
+                ? ImmutableList.of()
+                : ImmutableList.of(
+                    MediaCodecInfo.newInstance(
+                        /* name= */ "eac3-codec",
+                        /* mimeType= */ mimeType,
+                        /* codecMimeType= */ mimeType,
+                        /* capabilities= */ null,
+                        /* hardwareAccelerated= */ false,
+                        /* softwareOnly= */ true,
+                        /* vendor= */ false,
+                        /* forceDisableAdaptive= */ false,
+                        /* forceSecure= */ false));
+    MediaCodecAudioRenderer renderer =
+        new MediaCodecAudioRenderer(
+            ApplicationProvider.getApplicationContext(),
+            mediaCodecSelector,
+            /* enableDecoderFallback= */ false,
+            /* eventHandler= */ new Handler(Looper.getMainLooper()),
+            audioRendererEventListener,
+            audioSink);
+    renderer.init(/* index= */ 0, PlayerId.UNSET);
+
+    @Capabilities int capabilities = renderer.supportsFormat(mediaFormat);
+
+    assertThat(RendererCapabilities.getFormatSupport(capabilities)).isEqualTo(C.FORMAT_HANDLED);
   }
 
   private static Format getAudioSinkFormat(Format inputFormat) {

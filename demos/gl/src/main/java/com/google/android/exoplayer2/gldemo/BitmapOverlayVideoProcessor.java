@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.gldemo;
 
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -24,23 +26,29 @@ import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.GlProgram;
 import com.google.android.exoplayer2.util.GlUtil;
-import com.google.android.exoplayer2.util.Util;
+import com.google.android.exoplayer2.util.Log;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Locale;
 import javax.microedition.khronos.opengles.GL10;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * Video processor that demonstrates how to overlay a bitmap on video output using a GL shader. The
  * bitmap is drawn using an Android {@link Canvas}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class BitmapOverlayVideoProcessor
     implements VideoProcessingGLSurfaceView.VideoProcessor {
 
+  private static final String TAG = "BitmapOverlayVP";
   private static final int OVERLAY_WIDTH = 512;
   private static final int OVERLAY_HEIGHT = 256;
 
@@ -51,9 +59,7 @@ import javax.microedition.khronos.opengles.GL10;
   private final Bitmap logoBitmap;
   private final Canvas overlayCanvas;
 
-  private int program;
-  @Nullable private GlUtil.Attribute[] attributes;
-  @Nullable private GlUtil.Uniform[] uniforms;
+  private @MonotonicNonNull GlProgram program;
 
   private float bitmapScaleX;
   private float bitmapScaleY;
@@ -79,22 +85,26 @@ import javax.microedition.khronos.opengles.GL10;
 
   @Override
   public void initialize() {
-    String vertexShaderCode =
-        loadAssetAsString(context, "bitmap_overlay_video_processor_vertex.glsl");
-    String fragmentShaderCode =
-        loadAssetAsString(context, "bitmap_overlay_video_processor_fragment.glsl");
-    program = GlUtil.compileProgram(vertexShaderCode, fragmentShaderCode);
-    GlUtil.Attribute[] attributes = GlUtil.getAttributes(program);
-    GlUtil.Uniform[] uniforms = GlUtil.getUniforms(program);
-    for (GlUtil.Attribute attribute : attributes) {
-      if (attribute.name.equals("a_position")) {
-        attribute.setBuffer(new float[] {-1, -1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, 1, 1, 0, 1}, 4);
-      } else if (attribute.name.equals("a_texcoord")) {
-        attribute.setBuffer(new float[] {0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1}, 4);
-      }
+    try {
+      program =
+          new GlProgram(
+              context,
+              /* vertexShaderFilePath= */ "bitmap_overlay_video_processor_vertex.glsl",
+              /* fragmentShaderFilePath= */ "bitmap_overlay_video_processor_fragment.glsl");
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    } catch (GlUtil.GlException e) {
+      Log.e(TAG, "Failed to initialize the shader program", e);
+      return;
     }
-    this.attributes = attributes;
-    this.uniforms = uniforms;
+    program.setBufferAttribute(
+        "aFramePosition",
+        GlUtil.getNormalizedCoordinateBounds(),
+        GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE);
+    program.setBufferAttribute(
+        "aTexCoords",
+        GlUtil.getTextureCoordinateBounds(),
+        GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE);
     GLES20.glGenTextures(1, textures, 0);
     GLES20.glBindTexture(GL10.GL_TEXTURE_2D, textures[0]);
     GLES20.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, GL10.GL_NEAREST);
@@ -120,52 +130,41 @@ import javax.microedition.khronos.opengles.GL10;
     GLES20.glBindTexture(GL10.GL_TEXTURE_2D, textures[0]);
     GLUtils.texSubImage2D(
         GL10.GL_TEXTURE_2D, /* level= */ 0, /* xoffset= */ 0, /* yoffset= */ 0, overlayBitmap);
-    GlUtil.checkGlError();
+    try {
+      GlUtil.checkGlError();
+    } catch (GlUtil.GlException e) {
+      Log.e(TAG, "Failed to populate the texture", e);
+    }
 
     // Run the shader program.
-    GlUtil.Uniform[] uniforms = Assertions.checkNotNull(this.uniforms);
-    GlUtil.Attribute[] attributes = Assertions.checkNotNull(this.attributes);
-    GLES20.glUseProgram(program);
-    for (GlUtil.Uniform uniform : uniforms) {
-      switch (uniform.name) {
-        case "tex_sampler_0":
-          uniform.setSamplerTexId(frameTexture, /* unit= */ 0);
-          break;
-        case "tex_sampler_1":
-          uniform.setSamplerTexId(textures[0], /* unit= */ 1);
-          break;
-        case "scaleX":
-          uniform.setFloat(bitmapScaleX);
-          break;
-        case "scaleY":
-          uniform.setFloat(bitmapScaleY);
-          break;
-        case "tex_transform":
-          uniform.setFloats(transformMatrix);
-          break;
-        default: // fall out
-      }
-    }
-    for (GlUtil.Attribute copyExternalAttribute : attributes) {
-      copyExternalAttribute.bind();
-    }
-    for (GlUtil.Uniform copyExternalUniform : uniforms) {
-      copyExternalUniform.bind();
+    GlProgram program = checkNotNull(this.program);
+    program.setSamplerTexIdUniform("uTexSampler0", frameTexture, /* texUnitIndex= */ 0);
+    program.setSamplerTexIdUniform("uTexSampler1", textures[0], /* texUnitIndex= */ 1);
+    program.setFloatUniform("uScaleX", bitmapScaleX);
+    program.setFloatUniform("uScaleY", bitmapScaleY);
+    program.setFloatsUniform("uTexTransform", transformMatrix);
+    try {
+      program.bindAttributesAndUniforms();
+    } catch (GlUtil.GlException e) {
+      Log.e(TAG, "Failed to update the shader program", e);
     }
     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
     GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first= */ 0, /* count= */ 4);
-    GlUtil.checkGlError();
+    try {
+      GlUtil.checkGlError();
+    } catch (GlUtil.GlException e) {
+      Log.e(TAG, "Failed to draw a frame", e);
+    }
   }
 
-  private static String loadAssetAsString(Context context, String assetFileName) {
-    @Nullable InputStream inputStream = null;
-    try {
-      inputStream = context.getAssets().open(assetFileName);
-      return Util.fromUtf8Bytes(Util.toByteArray(inputStream));
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
-    } finally {
-      Util.closeQuietly(inputStream);
+  @Override
+  public void release() {
+    if (program != null) {
+      try {
+        program.delete();
+      } catch (GlUtil.GlException e) {
+        Log.e(TAG, "Failed to delete the shader program", e);
+      }
     }
   }
 }

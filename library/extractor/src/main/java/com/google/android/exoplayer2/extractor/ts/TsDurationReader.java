@@ -21,6 +21,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.Util;
@@ -35,8 +36,16 @@ import java.io.IOException;
  * stream, which can make PCR values at the beginning of the stream larger than PCR values at the
  * end. This class can only be used once to read duration from a given stream, and the usage of the
  * class is not thread-safe, so all calls should be made from the same thread.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class TsDurationReader {
+
+  private static final String TAG = "TsDurationReader";
 
   private final int timestampSearchBytes;
   private final TimestampAdjuster pcrTimestampAdjuster;
@@ -98,6 +107,10 @@ import java.io.IOException;
     long minPcrPositionUs = pcrTimestampAdjuster.adjustTsTimestamp(firstPcrValue);
     long maxPcrPositionUs = pcrTimestampAdjuster.adjustTsTimestamp(lastPcrValue);
     durationUs = maxPcrPositionUs - minPcrPositionUs;
+    if (durationUs < 0) {
+      Log.w(TAG, "Invalid duration: " + durationUs + ". Using TIME_UNSET instead.");
+      durationUs = C.TIME_UNSET;
+    }
     return finishReadDuration(input);
   }
 
@@ -196,5 +209,4 @@ import java.io.IOException;
     }
     return C.TIME_UNSET;
   }
-
 }

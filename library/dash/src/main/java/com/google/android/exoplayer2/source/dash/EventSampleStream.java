@@ -29,9 +29,15 @@ import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 
 /**
- * A {@link SampleStream} consisting of serialized {@link EventMessage}s read from an
- * {@link EventStream}.
+ * A {@link SampleStream} consisting of serialized {@link EventMessage}s read from an {@link
+ * EventStream}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 /* package */ final class EventSampleStream implements SampleStream {
 
   private final Format upstreamFormat;
@@ -100,23 +106,29 @@ import java.io.IOException;
   @Override
   public int readData(
       FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
+    boolean noMoreEventsInStream = currentIndex == eventTimesUs.length;
+    if (noMoreEventsInStream && !eventStreamAppendable) {
+      buffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
+      return C.RESULT_BUFFER_READ;
+    }
     if ((readFlags & FLAG_REQUIRE_FORMAT) != 0 || !isFormatSentDownstream) {
       formatHolder.format = upstreamFormat;
       isFormatSentDownstream = true;
       return C.RESULT_FORMAT_READ;
     }
-    if (currentIndex == eventTimesUs.length) {
-      if (!eventStreamAppendable) {
-        buffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
-        return C.RESULT_BUFFER_READ;
-      } else {
-        return C.RESULT_NOTHING_READ;
-      }
+    if (noMoreEventsInStream) {
+      // More events may be appended later.
+      return C.RESULT_NOTHING_READ;
     }
-    int sampleIndex = currentIndex++;
-    byte[] serializedEvent = eventMessageEncoder.encode(eventStream.events[sampleIndex]);
-    buffer.ensureSpaceForWrite(serializedEvent.length);
-    buffer.data.put(serializedEvent);
+    int sampleIndex = currentIndex;
+    if ((readFlags & SampleStream.FLAG_PEEK) == 0) {
+      currentIndex++;
+    }
+    if ((readFlags & SampleStream.FLAG_OMIT_SAMPLE_DATA) == 0) {
+      byte[] serializedEvent = eventMessageEncoder.encode(eventStream.events[sampleIndex]);
+      buffer.ensureSpaceForWrite(serializedEvent.length);
+      buffer.data.put(serializedEvent);
+    }
     buffer.timeUs = eventTimesUs[sampleIndex];
     buffer.setFlags(C.BUFFER_FLAG_KEY_FRAME);
     return C.RESULT_BUFFER_READ;
@@ -129,5 +141,4 @@ import java.io.IOException;
     currentIndex = newIndex;
     return skipped;
   }
-
 }

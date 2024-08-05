@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.extractor.jpeg;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -30,19 +31,30 @@ import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.mp4.Mp4Extractor;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.mp4.MotionPhotoMetadata;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** Extracts JPEG image using the Exif format. */
+/**
+ * Extracts JPEG image using the Exif format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class JpegExtractor implements Extractor {
 
   /** Parser states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     STATE_READING_MARKER,
     STATE_READING_SEGMENT_LENGTH,
@@ -78,7 +90,7 @@ public final class JpegExtractor implements Extractor {
 
   private @MonotonicNonNull ExtractorOutput extractorOutput;
 
-  @State private int state;
+  private @State int state;
   private int marker;
   private int segmentLength;
   private long mp4StartPosition;
@@ -90,7 +102,7 @@ public final class JpegExtractor implements Extractor {
 
   public JpegExtractor() {
     scratch = new ParsableByteArray(EXIF_ID_CODE_LENGTH);
-    mp4StartPosition = C.POSITION_UNSET;
+    mp4StartPosition = C.INDEX_UNSET;
   }
 
   @Override
@@ -122,8 +134,8 @@ public final class JpegExtractor implements Extractor {
   }
 
   @Override
-  @ReadResult
-  public int read(ExtractorInput input, PositionHolder seekPosition) throws IOException {
+  public @ReadResult int read(ExtractorInput input, PositionHolder seekPosition)
+      throws IOException {
     switch (state) {
       case STATE_READING_MARKER:
         readMarker(input);
@@ -196,7 +208,7 @@ public final class JpegExtractor implements Extractor {
     input.readFully(scratch.getData(), /* offset= */ 0, /* length= */ 2);
     marker = scratch.readUnsignedShort();
     if (marker == MARKER_SOS) { // Start of scan.
-      if (mp4StartPosition != C.POSITION_UNSET) {
+      if (mp4StartPosition != C.INDEX_UNSET) {
         state = STATE_SNIFFING_MOTION_PHOTO_VIDEO;
       } else {
         endReadingWithImageTrack();
@@ -273,7 +285,10 @@ public final class JpegExtractor implements Extractor {
     TrackOutput imageTrackOutput =
         checkNotNull(extractorOutput).track(IMAGE_TRACK_ID, C.TRACK_TYPE_IMAGE);
     imageTrackOutput.format(
-        new Format.Builder().setMetadata(new Metadata(metadataEntries)).build());
+        new Format.Builder()
+            .setContainerMimeType(MimeTypes.IMAGE_JPEG)
+            .setMetadata(new Metadata(metadataEntries))
+            .build());
   }
 
   /**

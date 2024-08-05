@@ -16,143 +16,241 @@
 package com.google.android.exoplayer2.transformer;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+import static com.google.android.exoplayer2.util.Assertions.checkState;
 import static com.google.android.exoplayer2.util.Util.SDK_INT;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
 
+import android.annotation.SuppressLint;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
-import android.os.ParcelFileDescriptor;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
+import android.util.SparseLongArray;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.container.Mp4LocationData;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.util.MediaFormatUtil;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 
-/** Muxer implementation that uses a {@link MediaMuxer}. */
-@RequiresApi(18)
+/**
+ * {@link Muxer} implementation that uses a {@link MediaMuxer}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class FrameworkMuxer implements Muxer {
 
+  // MediaMuxer supported sample formats are documented in MediaMuxer.addTrack(MediaFormat).
+  private static final ImmutableList<String> SUPPORTED_VIDEO_SAMPLE_MIME_TYPES =
+      Util.SDK_INT >= 24
+          ? ImmutableList.of(
+              MimeTypes.VIDEO_H263,
+              MimeTypes.VIDEO_H264,
+              MimeTypes.VIDEO_MP4V,
+              MimeTypes.VIDEO_H265)
+          : ImmutableList.of(MimeTypes.VIDEO_H263, MimeTypes.VIDEO_H264, MimeTypes.VIDEO_MP4V);
+
+  private static final ImmutableList<String> SUPPORTED_AUDIO_SAMPLE_MIME_TYPES =
+      ImmutableList.of(MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_AMR_NB, MimeTypes.AUDIO_AMR_WB);
+
+  /** {@link Muxer.Factory} for {@link FrameworkMuxer}. */
   public static final class Factory implements Muxer.Factory {
-    @Override
-    public FrameworkMuxer create(String path, String outputMimeType) throws IOException {
-      MediaMuxer mediaMuxer = new MediaMuxer(path, mimeTypeToMuxerOutputFormat(outputMimeType));
-      return new FrameworkMuxer(mediaMuxer, outputMimeType);
-    }
 
-    @RequiresApi(26)
-    @Override
-    public FrameworkMuxer create(ParcelFileDescriptor parcelFileDescriptor, String outputMimeType)
-        throws IOException {
-      MediaMuxer mediaMuxer =
-          new MediaMuxer(
-              parcelFileDescriptor.getFileDescriptor(),
-              mimeTypeToMuxerOutputFormat(outputMimeType));
-      return new FrameworkMuxer(mediaMuxer, outputMimeType);
+    private final long maxDelayBetweenSamplesMs;
+    private final long videoDurationMs;
+
+    public Factory(long maxDelayBetweenSamplesMs, long videoDurationMs) {
+      this.maxDelayBetweenSamplesMs = maxDelayBetweenSamplesMs;
+      this.videoDurationMs = videoDurationMs;
     }
 
     @Override
-    public boolean supportsOutputMimeType(String mimeType) {
+    public FrameworkMuxer create(String path) throws MuxerException {
+      MediaMuxer mediaMuxer;
       try {
-        mimeTypeToMuxerOutputFormat(mimeType);
-      } catch (IllegalStateException e) {
-        return false;
+        mediaMuxer = new MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+      } catch (IOException e) {
+        throw new MuxerException("Error creating muxer", e);
       }
-      return true;
+      return new FrameworkMuxer(mediaMuxer, maxDelayBetweenSamplesMs, videoDurationMs);
+    }
+
+    @Override
+    public ImmutableList<String> getSupportedSampleMimeTypes(@C.TrackType int trackType) {
+      if (trackType == C.TRACK_TYPE_VIDEO) {
+        return SUPPORTED_VIDEO_SAMPLE_MIME_TYPES;
+      } else if (trackType == C.TRACK_TYPE_AUDIO) {
+        return SUPPORTED_AUDIO_SAMPLE_MIME_TYPES;
+      }
+      return ImmutableList.of();
     }
   }
 
   private final MediaMuxer mediaMuxer;
-  private final String outputMimeType;
+  private final long maxDelayBetweenSamplesMs;
+  private final long videoDurationUs;
   private final MediaCodec.BufferInfo bufferInfo;
+  private final SparseLongArray trackIndexToLastPresentationTimeUs;
+
+  private int videoTrackIndex;
 
   private boolean isStarted;
 
-  private FrameworkMuxer(MediaMuxer mediaMuxer, String outputMimeType) {
+  private FrameworkMuxer(
+      MediaMuxer mediaMuxer, long maxDelayBetweenSamplesMs, long videoDurationMs) {
     this.mediaMuxer = mediaMuxer;
-    this.outputMimeType = outputMimeType;
+    this.maxDelayBetweenSamplesMs = maxDelayBetweenSamplesMs;
+    this.videoDurationUs = Util.msToUs(videoDurationMs);
     bufferInfo = new MediaCodec.BufferInfo();
+    trackIndexToLastPresentationTimeUs = new SparseLongArray();
+    videoTrackIndex = C.INDEX_UNSET;
   }
 
   @Override
-  public boolean supportsSampleMimeType(@Nullable String mimeType) {
-    // MediaMuxer supported sample formats are documented in MediaMuxer.addTrack(MediaFormat).
-    boolean isAudio = MimeTypes.isAudio(mimeType);
-    boolean isVideo = MimeTypes.isVideo(mimeType);
-    if (outputMimeType.equals(MimeTypes.VIDEO_MP4)) {
-      if (isVideo) {
-        return MimeTypes.VIDEO_H263.equals(mimeType)
-            || MimeTypes.VIDEO_H264.equals(mimeType)
-            || MimeTypes.VIDEO_MP4V.equals(mimeType)
-            || (Util.SDK_INT >= 24 && MimeTypes.VIDEO_H265.equals(mimeType));
-      } else if (isAudio) {
-        return MimeTypes.AUDIO_AAC.equals(mimeType)
-            || MimeTypes.AUDIO_AMR_NB.equals(mimeType)
-            || MimeTypes.AUDIO_AMR_WB.equals(mimeType);
-      }
-    } else if (outputMimeType.equals(MimeTypes.VIDEO_WEBM) && SDK_INT >= 21) {
-      if (isVideo) {
-        return MimeTypes.VIDEO_VP8.equals(mimeType)
-            || (Util.SDK_INT >= 24 && MimeTypes.VIDEO_VP9.equals(mimeType));
-      } else if (isAudio) {
-        return MimeTypes.AUDIO_VORBIS.equals(mimeType);
-      }
-    }
-    return false;
-  }
-
-  @Override
-  public int addTrack(Format format) {
+  public int addTrack(Format format) throws MuxerException {
     String sampleMimeType = checkNotNull(format.sampleMimeType);
     MediaFormat mediaFormat;
-    if (MimeTypes.isAudio(sampleMimeType)) {
-      mediaFormat =
-          MediaFormat.createAudioFormat(
-              castNonNull(sampleMimeType), format.sampleRate, format.channelCount);
+    boolean isVideo = MimeTypes.isVideo(sampleMimeType);
+    if (isVideo) {
+      mediaFormat = MediaFormat.createVideoFormat(sampleMimeType, format.width, format.height);
+      MediaFormatUtil.maybeSetColorInfo(mediaFormat, format.colorInfo);
+      try {
+        mediaMuxer.setOrientationHint(format.rotationDegrees);
+      } catch (RuntimeException e) {
+        throw new MuxerException(
+            "Failed to set orientation hint with rotationDegrees=" + format.rotationDegrees, e);
+      }
     } else {
       mediaFormat =
-          MediaFormat.createVideoFormat(castNonNull(sampleMimeType), format.width, format.height);
-      mediaMuxer.setOrientationHint(format.rotationDegrees);
+          MediaFormat.createAudioFormat(sampleMimeType, format.sampleRate, format.channelCount);
     }
     MediaFormatUtil.setCsdBuffers(mediaFormat, format.initializationData);
-    return mediaMuxer.addTrack(mediaFormat);
+    int trackIndex;
+    try {
+      trackIndex = mediaMuxer.addTrack(mediaFormat);
+    } catch (RuntimeException e) {
+      throw new MuxerException("Failed to add track with format=" + format, e);
+    }
+
+    if (isVideo) {
+      videoTrackIndex = trackIndex;
+    }
+
+    return trackIndex;
   }
 
   @Override
   public void writeSampleData(
-      int trackIndex, ByteBuffer data, boolean isKeyFrame, long presentationTimeUs) {
+      int trackIndex, ByteBuffer data, long presentationTimeUs, @C.BufferFlags int flags)
+      throws MuxerException {
+
+    if (videoDurationUs != C.TIME_UNSET
+        && trackIndex == videoTrackIndex
+        && presentationTimeUs > videoDurationUs) {
+      return;
+    }
+
     if (!isStarted) {
       isStarted = true;
-      mediaMuxer.start();
+      try {
+        mediaMuxer.start();
+      } catch (RuntimeException e) {
+        throw new MuxerException("Failed to start the muxer", e);
+      }
     }
+
     int offset = data.position();
     int size = data.limit() - offset;
-    int flags = isKeyFrame ? C.BUFFER_FLAG_KEY_FRAME : 0;
-    bufferInfo.set(offset, size, presentationTimeUs, flags);
-    mediaMuxer.writeSampleData(trackIndex, data, bufferInfo);
+
+    bufferInfo.set(offset, size, presentationTimeUs, TransformerUtil.getMediaCodecFlags(flags));
+    long lastSamplePresentationTimeUs = trackIndexToLastPresentationTimeUs.get(trackIndex);
+    // writeSampleData blocks on old API versions, so check here to avoid calling the method.
+    checkState(
+        Util.SDK_INT > 24 || presentationTimeUs >= lastSamplePresentationTimeUs,
+        "Samples not in presentation order ("
+            + presentationTimeUs
+            + " < "
+            + lastSamplePresentationTimeUs
+            + ") unsupported on this API version");
+    trackIndexToLastPresentationTimeUs.put(trackIndex, presentationTimeUs);
+    try {
+      mediaMuxer.writeSampleData(trackIndex, data, bufferInfo);
+    } catch (RuntimeException e) {
+      throw new MuxerException(
+          "Failed to write sample for trackIndex="
+              + trackIndex
+              + ", presentationTimeUs="
+              + presentationTimeUs
+              + ", size="
+              + size,
+          e);
+    }
   }
 
   @Override
-  public void release(boolean forCancellation) {
+  public void addMetadata(Metadata metadata) {
+    for (int i = 0; i < metadata.length(); i++) {
+      Metadata.Entry entry = metadata.get(i);
+      if (entry instanceof Mp4LocationData) {
+        mediaMuxer.setLocation(
+            ((Mp4LocationData) entry).latitude, ((Mp4LocationData) entry).longitude);
+      }
+    }
+  }
+
+  @Override
+  public void release(boolean forCancellation) throws MuxerException {
     if (!isStarted) {
       mediaMuxer.release();
       return;
     }
 
+    if (videoDurationUs != C.TIME_UNSET && videoTrackIndex != C.INDEX_UNSET) {
+      writeSampleData(
+          videoTrackIndex,
+          ByteBuffer.allocateDirect(0),
+          videoDurationUs,
+          C.BUFFER_FLAG_END_OF_STREAM);
+    }
+
     isStarted = false;
     try {
+      stopMuxer(mediaMuxer);
+    } catch (RuntimeException e) {
+      // It doesn't matter that stopping the muxer throws if the export is being cancelled.
+      if (!forCancellation) {
+        throw new MuxerException("Failed to stop the muxer", e);
+      }
+    } finally {
+      mediaMuxer.release();
+    }
+  }
+
+  @Override
+  public long getMaxDelayBetweenSamplesMs() {
+    return maxDelayBetweenSamplesMs;
+  }
+
+  // Accesses MediaMuxer state via reflection to ensure that muxer resources can be released even
+  // if stopping fails.
+  @SuppressLint("PrivateApi")
+  private static void stopMuxer(MediaMuxer mediaMuxer) {
+    try {
       mediaMuxer.stop();
-    } catch (IllegalStateException e) {
+    } catch (RuntimeException e) {
       if (SDK_INT < 30) {
         // Set the muxer state to stopped even if mediaMuxer.stop() failed so that
         // mediaMuxer.release() doesn't attempt to stop the muxer and therefore doesn't throw the
         // same exception without releasing its resources. This is already implemented in MediaMuxer
-        // from API level 30.
+        // from API level 30. See also b/80338884.
         try {
           Field muxerStoppedStateField = MediaMuxer.class.getDeclaredField("MUXER_STATE_STOPPED");
           muxerStoppedStateField.setAccessible(true);
@@ -164,31 +262,8 @@ import java.nio.ByteBuffer;
           // Do nothing.
         }
       }
-      // It doesn't matter that stopping the muxer throws if the transformation is being cancelled.
-      if (!forCancellation) {
-        throw e;
-      }
-    } finally {
-      mediaMuxer.release();
-    }
-  }
-
-  /**
-   * Converts a {@link MimeTypes MIME type} into a {@link MediaMuxer.OutputFormat MediaMuxer output
-   * format}.
-   *
-   * @param mimeType The {@link MimeTypes MIME type} to convert.
-   * @return The corresponding {@link MediaMuxer.OutputFormat MediaMuxer output format}.
-   * @throws IllegalArgumentException If the {@link MimeTypes MIME type} is not supported as output
-   *     format.
-   */
-  private static int mimeTypeToMuxerOutputFormat(String mimeType) {
-    if (mimeType.equals(MimeTypes.VIDEO_MP4)) {
-      return MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
-    } else if (SDK_INT >= 21 && mimeType.equals(MimeTypes.VIDEO_WEBM)) {
-      return MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
-    } else {
-      throw new IllegalArgumentException("Unsupported output MIME type: " + mimeType);
+      // Rethrow the original error.
+      throw e;
     }
   }
 }

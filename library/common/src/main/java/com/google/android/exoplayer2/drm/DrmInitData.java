@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.drm;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
+import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
@@ -29,7 +30,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-/** Initialization data for one or more DRM schemes. */
+/**
+ * Initialization data for one or more DRM schemes.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
 
   /**
@@ -51,7 +60,8 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
    * @param mediaData DRM session acquisition data obtained from the media.
    * @return A {@link DrmInitData} obtained from merging a media manifest and a media stream.
    */
-  public static @Nullable DrmInitData createSessionCreationData(
+  @Nullable
+  public static DrmInitData createSessionCreationData(
       @Nullable DrmInitData manifestData, @Nullable DrmInitData mediaData) {
     ArrayList<SchemeData> result = new ArrayList<>();
     String schemeType = null;
@@ -87,9 +97,7 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
   /** The protection scheme type, or null if not applicable or unknown. */
   @Nullable public final String schemeType;
 
-  /**
-   * Number of {@link SchemeData}s.
-   */
+  /** Number of {@link SchemeData}s. */
   public final int schemeDataCount;
 
   /**
@@ -122,8 +130,8 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
     this(schemeType, true, schemeDatas);
   }
 
-  private DrmInitData(@Nullable String schemeType, boolean cloneSchemeDatas,
-      SchemeData... schemeDatas) {
+  private DrmInitData(
+      @Nullable String schemeType, boolean cloneSchemeDatas, SchemeData... schemeDatas) {
     this.schemeType = schemeType;
     if (cloneSchemeDatas) {
       schemeDatas = schemeDatas.clone();
@@ -157,6 +165,7 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
    * @param schemeType A protection scheme type. May be null.
    * @return A copy with the specified protection scheme type.
    */
+  @CheckResult
   public DrmInitData copyWithSchemeType(@Nullable String schemeType) {
     if (Util.areEqual(this.schemeType, schemeType)) {
       return this;
@@ -208,7 +217,8 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
 
   @Override
   public int compare(SchemeData first, SchemeData second) {
-    return C.UUID_NIL.equals(first.uuid) ? (C.UUID_NIL.equals(second.uuid) ? 0 : 1)
+    return C.UUID_NIL.equals(first.uuid)
+        ? (C.UUID_NIL.equals(second.uuid) ? 0 : 1)
         : first.uuid.compareTo(second.uuid);
   }
 
@@ -228,17 +238,16 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
   public static final Parcelable.Creator<DrmInitData> CREATOR =
       new Parcelable.Creator<DrmInitData>() {
 
-    @Override
-    public DrmInitData createFromParcel(Parcel in) {
-      return new DrmInitData(in);
-    }
+        @Override
+        public DrmInitData createFromParcel(Parcel in) {
+          return new DrmInitData(in);
+        }
 
-    @Override
-    public DrmInitData[] newArray(int size) {
-      return new DrmInitData[size];
-    }
-
-  };
+        @Override
+        public DrmInitData[] newArray(int size) {
+          return new DrmInitData[size];
+        }
+      };
 
   // Internal methods.
 
@@ -252,9 +261,7 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
     return false;
   }
 
-  /**
-   * Scheme initialization data.
-   */
+  /** Scheme initialization data. */
   public static final class SchemeData implements Parcelable {
 
     // Lazily initialized hashcode.
@@ -324,9 +331,7 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
       return hasData() && !other.hasData() && matches(other.uuid);
     }
 
-    /**
-     * Returns whether {@link #data} is non-null.
-     */
+    /** Returns whether {@link #data} is non-null. */
     public boolean hasData() {
       return data != null;
     }
@@ -337,6 +342,7 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
      * @param data The data to include in the copy.
      * @return The new instance.
      */
+    @CheckResult
     public SchemeData copyWithData(@Nullable byte[] data) {
       return new SchemeData(uuid, licenseServerUrl, mimeType, data);
     }
@@ -387,18 +393,15 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
     public static final Parcelable.Creator<SchemeData> CREATOR =
         new Parcelable.Creator<SchemeData>() {
 
-      @Override
-      public SchemeData createFromParcel(Parcel in) {
-        return new SchemeData(in);
-      }
+          @Override
+          public SchemeData createFromParcel(Parcel in) {
+            return new SchemeData(in);
+          }
 
-      @Override
-      public SchemeData[] newArray(int size) {
-        return new SchemeData[size];
-      }
-
-    };
-
+          @Override
+          public SchemeData[] newArray(int size) {
+            return new SchemeData[size];
+          }
+        };
   }
-
 }

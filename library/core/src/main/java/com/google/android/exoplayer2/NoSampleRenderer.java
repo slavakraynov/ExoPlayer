@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2;
 
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MediaClock;
@@ -25,7 +26,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 /**
  * A {@link Renderer} implementation whose track type is {@link C#TRACK_TYPE_NONE} and does not
  * consume data from its {@link SampleStream}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public abstract class NoSampleRenderer implements Renderer, RendererCapabilities {
 
   private @MonotonicNonNull RendererConfiguration configuration;
@@ -35,7 +42,7 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
   private boolean streamIsFinal;
 
   @Override
-  public final int getTrackType() {
+  public final @C.TrackType int getTrackType() {
     return C.TRACK_TYPE_NONE;
   }
 
@@ -45,7 +52,7 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
   }
 
   @Override
-  public final void setIndex(int index) {
+  public final void init(int index, PlayerId playerId) {
     this.index = index;
   }
 
@@ -122,8 +129,7 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
   }
 
   @Override
-  public final void maybeThrowStreamError() throws IOException {
-  }
+  public final void maybeThrowStreamError() throws IOException {}
 
   @Override
   public final void resetPosition(long positionUs) throws ExoPlaybackException {
@@ -166,21 +172,20 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
   // RendererCapabilities implementation.
 
   @Override
-  @Capabilities
-  public int supportsFormat(Format format) throws ExoPlaybackException {
+  public @Capabilities int supportsFormat(Format format) throws ExoPlaybackException {
     return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE);
   }
 
   @Override
-  @AdaptiveSupport
-  public int supportsMixedMimeTypeAdaptation() throws ExoPlaybackException {
+  public @AdaptiveSupport int supportsMixedMimeTypeAdaptation() throws ExoPlaybackException {
     return ADAPTIVE_NOT_SUPPORTED;
   }
 
   // PlayerMessage.Target implementation.
 
   @Override
-  public void handleMessage(int what, @Nullable Object object) throws ExoPlaybackException {
+  public void handleMessage(@MessageType int messageType, @Nullable Object message)
+      throws ExoPlaybackException {
     // Do nothing.
   }
 
@@ -188,8 +193,8 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
 
   /**
    * Called when the renderer is enabled.
-   * <p>
-   * The default implementation is a no-op.
+   *
+   * <p>The default implementation is a no-op.
    *
    * @param joining Whether this renderer is being enabled to join an ongoing playback.
    * @throws ExoPlaybackException If an error occurs.
@@ -200,11 +205,11 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
 
   /**
    * Called when the renderer's offset has been changed.
-   * <p>
-   * The default implementation is a no-op.
    *
-   * @param offsetUs The offset that should be subtracted from {@code positionUs} in
-   *     {@link #render(long, long)} to get the playback position with respect to the media.
+   * <p>The default implementation is a no-op.
+   *
+   * @param offsetUs The offset that should be subtracted from {@code positionUs} in {@link
+   *     #render(long, long)} to get the playback position with respect to the media.
    * @throws ExoPlaybackException If an error occurs.
    */
   protected void onRendererOffsetChanged(long offsetUs) throws ExoPlaybackException {
@@ -212,11 +217,11 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
   }
 
   /**
-   * Called when the position is reset. This occurs when the renderer is enabled after
-   * {@link #onRendererOffsetChanged(long)} has been called, and also when a position
-   * discontinuity is encountered.
-   * <p>
-   * The default implementation is a no-op.
+   * Called when the position is reset. This occurs when the renderer is enabled after {@link
+   * #onRendererOffsetChanged(long)} has been called, and also when a position discontinuity is
+   * encountered.
+   *
+   * <p>The default implementation is a no-op.
    *
    * @param positionUs The new playback position in microseconds.
    * @param joining Whether this renderer is being enabled to join an ongoing playback.
@@ -228,8 +233,8 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
 
   /**
    * Called when the renderer is started.
-   * <p>
-   * The default implementation is a no-op.
+   *
+   * <p>The default implementation is a no-op.
    *
    * @throws ExoPlaybackException If an error occurs.
    */
@@ -248,8 +253,8 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
 
   /**
    * Called when the renderer is disabled.
-   * <p>
-   * The default implementation is a no-op.
+   *
+   * <p>The default implementation is a no-op.
    */
   protected void onDisabled() {
     // Do nothing.
@@ -275,11 +280,8 @@ public abstract class NoSampleRenderer implements Renderer, RendererCapabilities
     return configuration;
   }
 
-  /**
-   * Returns the index of the renderer within the player.
-   */
+  /** Returns the index of the renderer within the player. */
   protected final int getIndex() {
     return index;
   }
-
 }

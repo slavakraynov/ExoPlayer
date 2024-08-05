@@ -33,7 +33,15 @@ import com.google.android.exoplayer2.util.ParsableByteArray;
 import java.io.IOException;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** Extracts data from RTP packets. */
+/**
+ * Extracts data from RTP packets.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class RtpExtractor implements Extractor {
 
   private final RtpPayloadReader payloadReader;
@@ -106,15 +114,15 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public boolean sniff(ExtractorInput input) {
-    // TODO(b/172331505) Build sniff support.
-    return false;
+    throw new UnsupportedOperationException(
+        "RTP packets are transmitted in a packet stream do not support sniffing.");
   }
 
   @Override
   public void init(ExtractorOutput output) {
     payloadReader.createTracks(output, trackId);
     output.endTracks();
-    // TODO(b/172331505) replace hardcoded unseekable seekmap.
+    // RTP does not embed duration or seek info.
     output.seekMap(new SeekMap.Unseekable(C.TIME_UNSET));
     this.output = output;
   }
@@ -187,6 +195,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   @Override
   public void seek(long nextRtpTimestamp, long playbackStartTimeUs) {
     synchronized (lock) {
+      if (!isSeekPending) {
+        // Sets the isSeekPending flag, in the case preSeek() is not called, when seeking does not
+        // require RTSP message exchange. For example, playing back with non-zero start position.
+        isSeekPending = true;
+      }
       this.nextRtpTimestamp = nextRtpTimestamp;
       this.playbackStartTimeUs = playbackStartTimeUs;
     }

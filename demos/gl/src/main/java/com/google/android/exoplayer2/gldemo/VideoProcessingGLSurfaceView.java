@@ -23,13 +23,13 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Handler;
 import android.view.Surface;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.GlUtil;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.TimedValueQueue;
 import com.google.android.exoplayer2.video.VideoFrameMetadataListener;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +46,13 @@ import javax.microedition.khronos.opengles.GL10;
  *
  * <p>This view must be created programmatically, as it is necessary to specify whether a context
  * supporting protected content should be created at construction time.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
 
   /** Processes video frames, provided via a GL texture. */
@@ -65,16 +71,20 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
      * @param transformMatrix The 4 * 4 transform matrix to be applied to the texture.
      */
     void draw(int frameTexture, long frameTimestampUs, float[] transformMatrix);
+
+    /** Releases any resources associated with this {@link VideoProcessor}. */
+    void release();
   }
 
   private static final int EGL_PROTECTED_CONTENT_EXT = 0x32C0;
+  private static final String TAG = "VPGlSurfaceView";
 
   private final VideoRenderer renderer;
   private final Handler mainHandler;
 
   @Nullable private SurfaceTexture surfaceTexture;
   @Nullable private Surface surface;
-  @Nullable private ExoPlayer.VideoComponent videoComponent;
+  @Nullable private ExoPlayer player;
 
   /**
    * Creates a new instance. Pass {@code true} for {@code requireSecureContext} if the {@link
@@ -148,25 +158,24 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
   }
 
   /**
-   * Attaches or detaches (if {@code newVideoComponent} is {@code null}) this view from the video
-   * component of the player.
+   * Attaches or detaches (if {@code player} is {@code null}) this view from the player.
    *
-   * @param newVideoComponent The new video component, or {@code null} to detach this view.
+   * @param player The new player, or {@code null} to detach this view.
    */
-  public void setVideoComponent(@Nullable ExoPlayer.VideoComponent newVideoComponent) {
-    if (newVideoComponent == videoComponent) {
+  public void setPlayer(@Nullable ExoPlayer player) {
+    if (player == this.player) {
       return;
     }
-    if (videoComponent != null) {
+    if (this.player != null) {
       if (surface != null) {
-        videoComponent.clearVideoSurface(surface);
+        this.player.clearVideoSurface(surface);
       }
-      videoComponent.clearVideoFrameMetadataListener(renderer);
+      this.player.clearVideoFrameMetadataListener(renderer);
     }
-    videoComponent = newVideoComponent;
-    if (videoComponent != null) {
-      videoComponent.setVideoFrameMetadataListener(renderer);
-      videoComponent.setVideoSurface(surface);
+    this.player = player;
+    if (this.player != null) {
+      this.player.setVideoFrameMetadataListener(renderer);
+      this.player.setVideoSurface(surface);
     }
   }
 
@@ -177,8 +186,8 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
     mainHandler.post(
         () -> {
           if (surface != null) {
-            if (videoComponent != null) {
-              videoComponent.setVideoSurface(null);
+            if (player != null) {
+              player.setVideoSurface(null);
             }
             releaseSurface(surfaceTexture, surface);
             surfaceTexture = null;
@@ -195,8 +204,8 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
           this.surfaceTexture = surfaceTexture;
           this.surface = new Surface(surfaceTexture);
           releaseSurface(oldSurfaceTexture, oldSurface);
-          if (videoComponent != null) {
-            videoComponent.setVideoSurface(surface);
+          if (player != null) {
+            player.setVideoSurface(surface);
           }
         });
   }
@@ -238,7 +247,11 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
 
     @Override
     public synchronized void onSurfaceCreated(GL10 gl, EGLConfig config) {
-      texture = GlUtil.createExternalTexture();
+      try {
+        texture = GlUtil.createExternalTexture();
+      } catch (GlUtil.GlException e) {
+        Log.e(TAG, "Failed to create an external texture", e);
+      }
       surfaceTexture = new SurfaceTexture(texture);
       surfaceTexture.setOnFrameAvailableListener(
           surfaceTexture -> {
@@ -290,7 +303,7 @@ public final class VideoProcessingGLSurfaceView extends GLSurfaceView {
     public void onVideoFrameAboutToBeRendered(
         long presentationTimeUs,
         long releaseTimeNs,
-        @NonNull Format format,
+        Format format,
         @Nullable MediaFormat mediaFormat) {
       sampleTimestampQueue.add(releaseTimeNs, presentationTimeUs);
     }

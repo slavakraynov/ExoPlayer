@@ -26,10 +26,10 @@ import com.google.android.exoplayer2.testutil.FakeExtractorOutput;
 import com.google.android.exoplayer2.testutil.FakeTrackOutput;
 import com.google.android.exoplayer2.testutil.TestUtil;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.List;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -43,10 +43,10 @@ public final class FlacExtractorSeekTest {
       "media/flac/bear_no_seek_table_no_num_samples.flac";
   private static final int DURATION_US = 2_741_000;
 
-  private FlacExtractor extractor = new FlacExtractor();
-  private FakeExtractorOutput extractorOutput = new FakeExtractorOutput();
-  private DefaultDataSource dataSource =
-      new DefaultDataSourceFactory(ApplicationProvider.getApplicationContext()).createDataSource();
+  private final FlacExtractor extractor = new FlacExtractor();
+  private final FakeExtractorOutput extractorOutput = new FakeExtractorOutput();
+  private final DefaultDataSource dataSource =
+      new DefaultDataSource.Factory(ApplicationProvider.getApplicationContext()).createDataSource();
 
   @Test
   public void flacExtractorReads_seekTable_returnSeekableSeekMap() throws IOException {
@@ -76,6 +76,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_seekTable_handlesSeekToEoF() throws IOException {
     String fileName = TEST_FILE_SEEK_TABLE;
@@ -93,6 +94,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_seekTable_handlesSeekingBackward() throws IOException {
     String fileName = TEST_FILE_SEEK_TABLE;
@@ -112,6 +114,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_seekTable_handlesSeekingForward() throws IOException {
     String fileName = TEST_FILE_SEEK_TABLE;
@@ -159,6 +162,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_binarySearch_handlesSeekToEoF() throws IOException {
     String fileName = TEST_FILE_BINARY_SEARCH;
@@ -176,6 +180,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_binarySearch_handlesSeekingBackward() throws IOException {
     String fileName = TEST_FILE_BINARY_SEARCH;
@@ -195,6 +200,7 @@ public final class FlacExtractorSeekTest {
         fileName, trackOutput, targetSeekTimeUs, extractedFrameIndex);
   }
 
+  @Ignore("Fix [internal: b/249505968] before enabling this.")
   @Test
   public void seeking_binarySearch_handlesSeekingForward() throws IOException {
     String fileName = TEST_FILE_BINARY_SEARCH;

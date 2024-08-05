@@ -23,11 +23,19 @@ import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.source.chunk.ChunkExtractor.TrackOutputProvider;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DataSourceUtil;
 import com.google.android.exoplayer2.upstream.DataSpec;
-import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 
-/** A {@link BaseMediaChunk} that uses an {@link Extractor} to decode sample data. */
+/**
+ * A {@link BaseMediaChunk} that uses an {@link Extractor} to decode sample data.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class ContainerMediaChunk extends BaseMediaChunk {
 
   private final int chunkCount;
@@ -61,7 +69,7 @@ public class ContainerMediaChunk extends BaseMediaChunk {
       DataSource dataSource,
       DataSpec dataSpec,
       Format trackFormat,
-      int trackSelectionReason,
+      @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
       long startTimeUs,
       long endTimeUs,
@@ -129,7 +137,7 @@ public class ContainerMediaChunk extends BaseMediaChunk {
         nextLoadPosition = input.getPosition() - dataSpec.position;
       }
     } finally {
-      Util.closeQuietly(dataSource);
+      DataSourceUtil.closeQuietly(dataSource);
     }
     loadCompleted = !loadCanceled;
   }

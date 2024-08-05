@@ -21,7 +21,15 @@ import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.metadata.id3.MlltFrame;
 import com.google.android.exoplayer2.util.Util;
 
-/** MP3 seeker that uses metadata from an {@link MlltFrame}. */
+/**
+ * MP3 seeker that uses metadata from an {@link MlltFrame}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 /* package */ final class MlltSeeker implements Seeker {
 
   /**
@@ -62,7 +70,7 @@ import com.google.android.exoplayer2.util.Util;
     this.durationUs =
         durationUs != C.TIME_UNSET
             ? durationUs
-            : C.msToUs(referenceTimesMs[referenceTimesMs.length - 1]);
+            : Util.msToUs(referenceTimesMs[referenceTimesMs.length - 1]);
   }
 
   @Override
@@ -74,8 +82,8 @@ import com.google.android.exoplayer2.util.Util;
   public SeekPoints getSeekPoints(long timeUs) {
     timeUs = Util.constrainValue(timeUs, 0, durationUs);
     Pair<Long, Long> timeMsAndPosition =
-        linearlyInterpolate(C.usToMs(timeUs), referenceTimesMs, referencePositions);
-    timeUs = C.msToUs(timeMsAndPosition.first);
+        linearlyInterpolate(Util.usToMs(timeUs), referenceTimesMs, referencePositions);
+    timeUs = Util.msToUs(timeMsAndPosition.first);
     long position = timeMsAndPosition.second;
     return new SeekPoints(new SeekPoint(timeUs, position));
   }
@@ -84,7 +92,7 @@ import com.google.android.exoplayer2.util.Util;
   public long getTimeUs(long position) {
     Pair<Long, Long> positionAndTimeMs =
         linearlyInterpolate(position, referencePositions, referenceTimesMs);
-    return C.msToUs(positionAndTimeMs.second);
+    return Util.msToUs(positionAndTimeMs.second);
   }
 
   @Override
@@ -125,6 +133,6 @@ import com.google.android.exoplayer2.util.Util;
 
   @Override
   public long getDataEndPosition() {
-    return C.POSITION_UNSET;
+    return C.INDEX_UNSET;
   }
 }

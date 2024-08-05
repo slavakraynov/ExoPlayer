@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.source;
 
 import android.net.Uri;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
@@ -25,14 +26,26 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** Extracts the contents of a container file from a progressive media stream. */
+/**
+ * Extracts the contents of a container file from a progressive media stream.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public interface ProgressiveMediaExtractor {
 
   /** Creates {@link ProgressiveMediaExtractor} instances. */
   interface Factory {
 
-    /** Returns a new {@link ProgressiveMediaExtractor} instance. */
-    ProgressiveMediaExtractor createProgressiveMediaExtractor();
+    /**
+     * Returns a new {@link ProgressiveMediaExtractor} instance.
+     *
+     * @param playerId The {@link PlayerId} of the player this extractor is used for.
+     */
+    ProgressiveMediaExtractor createProgressiveMediaExtractor(PlayerId playerId);
   }
 
   /**
@@ -68,8 +81,8 @@ public interface ProgressiveMediaExtractor {
   void disableSeekingOnMp3Streams();
 
   /**
-   * Returns the current read position in the input stream, or {@link C#POSITION_UNSET} if no input
-   * is available.
+   * Returns the current read position in the input stream, or {@link C#INDEX_UNSET} if no input is
+   * available.
    */
   long getCurrentInputPosition();
 

@@ -18,7 +18,15 @@ package com.google.android.exoplayer2.source;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Timeline;
 
-/** An overridable {@link Timeline} implementation forwarding all methods to another timeline. */
+/**
+ * An overridable {@link Timeline} implementation forwarding all methods to another timeline.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public abstract class ForwardingTimeline extends Timeline {
 
   protected final Timeline timeline;
@@ -33,14 +41,14 @@ public abstract class ForwardingTimeline extends Timeline {
   }
 
   @Override
-  public int getNextWindowIndex(int windowIndex, @Player.RepeatMode int repeatMode,
-      boolean shuffleModeEnabled) {
+  public int getNextWindowIndex(
+      int windowIndex, @Player.RepeatMode int repeatMode, boolean shuffleModeEnabled) {
     return timeline.getNextWindowIndex(windowIndex, repeatMode, shuffleModeEnabled);
   }
 
   @Override
-  public int getPreviousWindowIndex(int windowIndex, @Player.RepeatMode int repeatMode,
-      boolean shuffleModeEnabled) {
+  public int getPreviousWindowIndex(
+      int windowIndex, @Player.RepeatMode int repeatMode, boolean shuffleModeEnabled) {
     return timeline.getPreviousWindowIndex(windowIndex, repeatMode, shuffleModeEnabled);
   }
 

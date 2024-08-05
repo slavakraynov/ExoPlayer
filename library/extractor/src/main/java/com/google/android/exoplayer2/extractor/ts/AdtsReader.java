@@ -38,7 +38,15 @@ import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Parses a continuous ADTS byte stream and extracts individual frames. */
+/**
+ * Parses a continuous ADTS byte stream and extracts individual frames.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class AdtsReader implements ElementaryStreamReader {
 
   private static final String TAG = "AdtsReader";
@@ -116,6 +124,7 @@ public final class AdtsReader implements ElementaryStreamReader {
     firstFrameVersion = VERSION_UNSET;
     firstFrameSampleRateIndex = C.INDEX_UNSET;
     sampleDurationUs = C.TIME_UNSET;
+    timeUs = C.TIME_UNSET;
     this.exposeId3 = exposeId3;
     this.language = language;
   }
@@ -127,6 +136,7 @@ public final class AdtsReader implements ElementaryStreamReader {
 
   @Override
   public void seek() {
+    timeUs = C.TIME_UNSET;
     resetSync();
   }
 
@@ -151,7 +161,9 @@ public final class AdtsReader implements ElementaryStreamReader {
 
   @Override
   public void packetStarted(long pesTimeUs, @TsPayloadReader.Flags int flags) {
-    timeUs = pesTimeUs;
+    if (pesTimeUs != C.TIME_UNSET) {
+      timeUs = pesTimeUs;
+    }
   }
 
   @Override
@@ -219,9 +231,7 @@ public final class AdtsReader implements ElementaryStreamReader {
     return bytesRead == targetLength;
   }
 
-  /**
-   * Sets the state to STATE_FINDING_SAMPLE.
-   */
+  /** Sets the state to STATE_FINDING_SAMPLE. */
   private void setFindingSampleState() {
     state = STATE_FINDING_SAMPLE;
     bytesRead = 0;
@@ -229,8 +239,8 @@ public final class AdtsReader implements ElementaryStreamReader {
   }
 
   /**
-   * Sets the state to STATE_READING_ID3_HEADER and resets the fields required for
-   * {@link #parseId3Header()}.
+   * Sets the state to STATE_READING_ID3_HEADER and resets the fields required for {@link
+   * #parseId3Header()}.
    */
   private void setReadingId3HeaderState() {
     state = STATE_READING_ID3_HEADER;
@@ -247,8 +257,8 @@ public final class AdtsReader implements ElementaryStreamReader {
    * @param priorReadBytes Size of prior read bytes
    * @param sampleSize Size of the sample
    */
-  private void setReadingSampleState(TrackOutput outputToUse, long currentSampleDuration,
-      int priorReadBytes, int sampleSize) {
+  private void setReadingSampleState(
+      TrackOutput outputToUse, long currentSampleDuration, int priorReadBytes, int sampleSize) {
     state = STATE_READING_SAMPLE;
     bytesRead = priorReadBytes;
     this.currentOutput = outputToUse;
@@ -256,9 +266,7 @@ public final class AdtsReader implements ElementaryStreamReader {
     this.sampleSize = sampleSize;
   }
 
-  /**
-   * Sets the state to STATE_READING_ADTS_HEADER.
-   */
+  /** Sets the state to STATE_READING_ADTS_HEADER. */
   private void setReadingAdtsHeaderState() {
     state = STATE_READING_ADTS_HEADER;
     bytesRead = 0;
@@ -468,8 +476,8 @@ public final class AdtsReader implements ElementaryStreamReader {
   private void parseId3Header() {
     id3Output.sampleData(id3HeaderBuffer, ID3_HEADER_SIZE);
     id3HeaderBuffer.setPosition(ID3_SIZE_OFFSET);
-    setReadingSampleState(id3Output, 0, ID3_HEADER_SIZE,
-        id3HeaderBuffer.readSynchSafeInt() + ID3_HEADER_SIZE);
+    setReadingSampleState(
+        id3Output, 0, ID3_HEADER_SIZE, id3HeaderBuffer.readSynchSafeInt() + ID3_HEADER_SIZE);
   }
 
   /** Parses the sample header. */
@@ -535,8 +543,10 @@ public final class AdtsReader implements ElementaryStreamReader {
     currentOutput.sampleData(data, bytesToRead);
     bytesRead += bytesToRead;
     if (bytesRead == sampleSize) {
-      currentOutput.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
-      timeUs += currentSampleDuration;
+      if (timeUs != C.TIME_UNSET) {
+        currentOutput.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
+        timeUs += currentSampleDuration;
+      }
       setFindingSampleState();
     }
   }

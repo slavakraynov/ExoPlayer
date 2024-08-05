@@ -29,7 +29,15 @@ import com.google.android.exoplayer2.util.ParsableByteArray;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Parses a continuous DTS byte stream and extracts individual samples. */
+/**
+ * Parses a continuous DTS byte stream and extracts individual samples.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class DtsReader implements ElementaryStreamReader {
 
   private static final int STATE_FINDING_SYNC = 0;
@@ -66,6 +74,7 @@ public final class DtsReader implements ElementaryStreamReader {
   public DtsReader(@Nullable String language) {
     headerScratchBytes = new ParsableByteArray(new byte[HEADER_SIZE]);
     state = STATE_FINDING_SYNC;
+    timeUs = C.TIME_UNSET;
     this.language = language;
   }
 
@@ -74,6 +83,7 @@ public final class DtsReader implements ElementaryStreamReader {
     state = STATE_FINDING_SYNC;
     bytesRead = 0;
     syncBytes = 0;
+    timeUs = C.TIME_UNSET;
   }
 
   @Override
@@ -85,7 +95,9 @@ public final class DtsReader implements ElementaryStreamReader {
 
   @Override
   public void packetStarted(long pesTimeUs, @TsPayloadReader.Flags int flags) {
-    timeUs = pesTimeUs;
+    if (pesTimeUs != C.TIME_UNSET) {
+      timeUs = pesTimeUs;
+    }
   }
 
   @Override
@@ -111,8 +123,10 @@ public final class DtsReader implements ElementaryStreamReader {
           output.sampleData(data, bytesToRead);
           bytesRead += bytesToRead;
           if (bytesRead == sampleSize) {
-            output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
-            timeUs += sampleDurationUs;
+            if (timeUs != C.TIME_UNSET) {
+              output.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
+              timeUs += sampleDurationUs;
+            }
             state = STATE_FINDING_SYNC;
           }
           break;
@@ -179,8 +193,8 @@ public final class DtsReader implements ElementaryStreamReader {
     sampleSize = DtsUtil.getDtsFrameSize(frameData);
     // In this class a sample is an access unit (frame in DTS), but the format's sample rate
     // specifies the number of PCM audio samples per second.
-    sampleDurationUs = (int) (C.MICROS_PER_SECOND
-        * DtsUtil.parseDtsAudioSampleCount(frameData) / format.sampleRate);
+    sampleDurationUs =
+        (int)
+            (C.MICROS_PER_SECOND * DtsUtil.parseDtsAudioSampleCount(frameData) / format.sampleRate);
   }
-
 }

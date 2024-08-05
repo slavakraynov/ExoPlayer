@@ -22,7 +22,15 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.util.Assertions;
 
-/** An abstract base class for {@link Chunk}s that contain media samples. */
+/**
+ * An abstract base class for {@link Chunk}s that contain media samples.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public abstract class MediaChunk extends Chunk {
 
   /** The chunk index, or {@link C#INDEX_UNSET} if it is not known. */
@@ -42,13 +50,20 @@ public abstract class MediaChunk extends Chunk {
       DataSource dataSource,
       DataSpec dataSpec,
       Format trackFormat,
-      int trackSelectionReason,
+      @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
       long startTimeUs,
       long endTimeUs,
       long chunkIndex) {
-    super(dataSource, dataSpec, C.DATA_TYPE_MEDIA, trackFormat, trackSelectionReason,
-        trackSelectionData, startTimeUs, endTimeUs);
+    super(
+        dataSource,
+        dataSpec,
+        C.DATA_TYPE_MEDIA,
+        trackFormat,
+        trackSelectionReason,
+        trackSelectionData,
+        startTimeUs,
+        endTimeUs);
     Assertions.checkNotNull(trackFormat);
     this.chunkIndex = chunkIndex;
   }
@@ -58,9 +73,6 @@ public abstract class MediaChunk extends Chunk {
     return chunkIndex != C.INDEX_UNSET ? chunkIndex + 1 : C.INDEX_UNSET;
   }
 
-  /**
-   * Returns whether the chunk has been fully loaded.
-   */
+  /** Returns whether the chunk has been fully loaded. */
   public abstract boolean isLoadCompleted();
-
 }

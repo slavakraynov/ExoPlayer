@@ -15,13 +15,28 @@
  */
 package com.google.android.exoplayer2;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import androidx.annotation.IntDef;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/** A timeout of an operation on the ExoPlayer playback thread. */
-public final class ExoTimeoutException extends Exception {
+/**
+ * A timeout of an operation on the ExoPlayer playback thread.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
+public final class ExoTimeoutException extends RuntimeException {
 
   /**
    * The operation which produced the timeout error. One of {@link #TIMEOUT_OPERATION_RELEASE},
@@ -29,8 +44,11 @@ public final class ExoTimeoutException extends Exception {
    * {@link #TIMEOUT_OPERATION_UNDEFINED}. Note that new operations may be added in the future and
    * error handling should handle unknown operation values.
    */
+  // @Target list includes both 'default' targets and TYPE_USE, to ensure backwards compatibility
+  // with Kotlin usages from before TYPE_USE was added.
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target({FIELD, METHOD, PARAMETER, LOCAL_VARIABLE, TYPE_USE})
   @IntDef({
     TIMEOUT_OPERATION_UNDEFINED,
     TIMEOUT_OPERATION_RELEASE,
@@ -49,7 +67,7 @@ public final class ExoTimeoutException extends Exception {
   public static final int TIMEOUT_OPERATION_DETACH_SURFACE = 3;
 
   /** The operation on the ExoPlayer playback thread that timed out. */
-  @TimeoutOperation public final int timeoutOperation;
+  public final @TimeoutOperation int timeoutOperation;
 
   /**
    * Creates the timeout exception.

@@ -18,14 +18,19 @@ package com.google.android.exoplayer2;
 import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 
 import android.os.Bundle;
-import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.util.Util;
 import com.google.common.base.Objects;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
-/** A rating expressed as "thumbs up" or "thumbs down". */
+/**
+ * A rating expressed as "thumbs up" or "thumbs down".
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class ThumbRating extends Rating {
 
   private final boolean rated;
@@ -73,22 +78,17 @@ public final class ThumbRating extends Rating {
 
   // Bundleable implementation.
 
-  @RatingType private static final int TYPE = RATING_TYPE_THUMB;
+  private static final @RatingType int TYPE = RATING_TYPE_THUMB;
 
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef({FIELD_RATING_TYPE, FIELD_RATED, FIELD_IS_THUMBS_UP})
-  private @interface FieldNumber {}
-
-  private static final int FIELD_RATED = 1;
-  private static final int FIELD_IS_THUMBS_UP = 2;
+  private static final String FIELD_RATED = Util.intToStringMaxRadix(1);
+  private static final String FIELD_IS_THUMBS_UP = Util.intToStringMaxRadix(2);
 
   @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
-    bundle.putInt(keyForField(FIELD_RATING_TYPE), TYPE);
-    bundle.putBoolean(keyForField(FIELD_RATED), rated);
-    bundle.putBoolean(keyForField(FIELD_IS_THUMBS_UP), isThumbsUp);
+    bundle.putInt(FIELD_RATING_TYPE, TYPE);
+    bundle.putBoolean(FIELD_RATED, rated);
+    bundle.putBoolean(FIELD_IS_THUMBS_UP, isThumbsUp);
     return bundle;
   }
 
@@ -96,17 +96,10 @@ public final class ThumbRating extends Rating {
   public static final Creator<ThumbRating> CREATOR = ThumbRating::fromBundle;
 
   private static ThumbRating fromBundle(Bundle bundle) {
-    checkArgument(
-        bundle.getInt(keyForField(FIELD_RATING_TYPE), /* defaultValue= */ RATING_TYPE_DEFAULT)
-            == TYPE);
-    boolean rated = bundle.getBoolean(keyForField(FIELD_RATED), /* defaultValue= */ false);
+    checkArgument(bundle.getInt(FIELD_RATING_TYPE, /* defaultValue= */ RATING_TYPE_UNSET) == TYPE);
+    boolean rated = bundle.getBoolean(FIELD_RATED, /* defaultValue= */ false);
     return rated
-        ? new ThumbRating(
-            bundle.getBoolean(keyForField(FIELD_IS_THUMBS_UP), /* defaultValue= */ false))
+        ? new ThumbRating(bundle.getBoolean(FIELD_IS_THUMBS_UP, /* defaultValue= */ false))
         : new ThumbRating();
-  }
-
-  private static String keyForField(@FieldNumber int field) {
-    return Integer.toString(field, Character.MAX_RADIX);
   }
 }

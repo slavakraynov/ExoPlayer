@@ -29,7 +29,13 @@ import java.util.concurrent.Executor;
  * Default {@link DownloaderFactory}, supporting creation of progressive, DASH, HLS and
  * SmoothStreaming downloaders. Note that for the latter three, the corresponding library module
  * must be built into the application.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public class DefaultDownloaderFactory implements DownloaderFactory {
 
   private static final SparseArray<Constructor<? extends Downloader>> CONSTRUCTORS =
@@ -71,11 +77,11 @@ public class DefaultDownloaderFactory implements DownloaderFactory {
     @C.ContentType
     int contentType = Util.inferContentTypeForUriAndMimeType(request.uri, request.mimeType);
     switch (contentType) {
-      case C.TYPE_DASH:
-      case C.TYPE_HLS:
-      case C.TYPE_SS:
+      case C.CONTENT_TYPE_DASH:
+      case C.CONTENT_TYPE_HLS:
+      case C.CONTENT_TYPE_SS:
         return createDownloader(request, contentType);
-      case C.TYPE_OTHER:
+      case C.CONTENT_TYPE_OTHER:
         return new ProgressiveDownloader(
             new MediaItem.Builder()
                 .setUri(request.uri)
@@ -98,22 +104,20 @@ public class DefaultDownloaderFactory implements DownloaderFactory {
             .setUri(request.uri)
             .setStreamKeys(request.streamKeys)
             .setCustomCacheKey(request.customCacheKey)
-            .setDrmKeySetId(request.keySetId)
             .build();
     try {
       return constructor.newInstance(mediaItem, cacheDataSourceFactory, executor);
     } catch (Exception e) {
       throw new IllegalStateException(
-          "Failed to instantiate downloader for content type " + contentType);
+          "Failed to instantiate downloader for content type " + contentType, e);
     }
   }
 
-  // LINT.IfChange
   private static SparseArray<Constructor<? extends Downloader>> createDownloaderConstructors() {
     SparseArray<Constructor<? extends Downloader>> array = new SparseArray<>();
     try {
       array.put(
-          C.TYPE_DASH,
+          C.CONTENT_TYPE_DASH,
           getDownloaderConstructor(
               Class.forName("com.google.android.exoplayer2.source.dash.offline.DashDownloader")));
     } catch (ClassNotFoundException e) {
@@ -122,7 +126,7 @@ public class DefaultDownloaderFactory implements DownloaderFactory {
 
     try {
       array.put(
-          C.TYPE_HLS,
+          C.CONTENT_TYPE_HLS,
           getDownloaderConstructor(
               Class.forName("com.google.android.exoplayer2.source.hls.offline.HlsDownloader")));
     } catch (ClassNotFoundException e) {
@@ -130,7 +134,7 @@ public class DefaultDownloaderFactory implements DownloaderFactory {
     }
     try {
       array.put(
-          C.TYPE_SS,
+          C.CONTENT_TYPE_SS,
           getDownloaderConstructor(
               Class.forName(
                   "com.google.android.exoplayer2.source.smoothstreaming.offline.SsDownloader")));
@@ -150,5 +154,4 @@ public class DefaultDownloaderFactory implements DownloaderFactory {
       throw new IllegalStateException("Downloader constructor missing", e);
     }
   }
-  // LINT.ThenChange(../../../../../../../../proguard-rules.txt)
 }

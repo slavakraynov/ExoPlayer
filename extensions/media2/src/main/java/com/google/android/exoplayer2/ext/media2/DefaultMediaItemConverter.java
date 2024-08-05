@@ -27,6 +27,7 @@ import androidx.media2.common.FileMediaItem;
 import androidx.media2.common.UriMediaItem;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.MediaMetadata;
 import com.google.android.exoplayer2.util.Assertions;
 
 /**
@@ -34,7 +35,13 @@ import com.google.android.exoplayer2.util.Assertions;
  *
  * <p>Note that {@link #getMetadata} can be overridden to fill in additional metadata when
  * converting {@link MediaItem ExoPlayer MediaItems} to their AndroidX equivalents.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public class DefaultMediaItemConverter implements MediaItemConverter {
 
   @Override
@@ -85,28 +92,30 @@ public class DefaultMediaItemConverter implements MediaItemConverter {
     return new MediaItem.Builder()
         .setUri(uri)
         .setMediaId(mediaId != null ? mediaId : MediaItem.DEFAULT_MEDIA_ID)
-        .setMediaMetadata(
-            new com.google.android.exoplayer2.MediaMetadata.Builder().setTitle(title).build())
+        .setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build())
         .setTag(media2MediaItem)
-        .setClipStartPositionMs(startPositionMs)
-        .setClipEndPositionMs(endPositionMs)
+        .setClippingConfiguration(
+            new MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(startPositionMs)
+                .setEndPositionMs(endPositionMs)
+                .build())
         .build();
   }
 
   @Override
   public androidx.media2.common.MediaItem convertToMedia2MediaItem(MediaItem exoPlayerMediaItem) {
     Assertions.checkNotNull(exoPlayerMediaItem);
-    MediaItem.PlaybackProperties playbackProperties =
-        Assertions.checkNotNull(exoPlayerMediaItem.playbackProperties);
+    MediaItem.LocalConfiguration localConfiguration =
+        Assertions.checkNotNull(exoPlayerMediaItem.localConfiguration);
 
-    @Nullable Object tag = playbackProperties.tag;
+    @Nullable Object tag = localConfiguration.tag;
     if (tag instanceof androidx.media2.common.MediaItem) {
       return (androidx.media2.common.MediaItem) tag;
     }
 
     androidx.media2.common.MediaMetadata metadata = getMetadata(exoPlayerMediaItem);
-    long startPositionMs = exoPlayerMediaItem.clippingProperties.startPositionMs;
-    long endPositionMs = exoPlayerMediaItem.clippingProperties.endPositionMs;
+    long startPositionMs = exoPlayerMediaItem.clippingConfiguration.startPositionMs;
+    long endPositionMs = exoPlayerMediaItem.clippingConfiguration.endPositionMs;
     if (endPositionMs == C.TIME_END_OF_SOURCE) {
       endPositionMs = androidx.media2.common.MediaItem.POSITION_UNKNOWN;
     }

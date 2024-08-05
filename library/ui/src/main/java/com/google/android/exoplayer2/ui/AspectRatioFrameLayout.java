@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.ui;
 
+import static java.lang.annotation.ElementType.TYPE_USE;
+
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
@@ -24,8 +26,17 @@ import androidx.annotation.Nullable;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/** A {@link FrameLayout} that resizes itself to match a specified aspect ratio. */
+/**
+ * A {@link FrameLayout} that resizes itself to match a specified aspect ratio.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class AspectRatioFrameLayout extends FrameLayout {
 
   /** Listener to be notified about changes of the aspect ratios of this view. */
@@ -44,7 +55,6 @@ public final class AspectRatioFrameLayout extends FrameLayout {
         float targetAspectRatio, float naturalAspectRatio, boolean aspectRatioMismatch);
   }
 
-  // LINT.IfChange
   /**
    * Resize modes for {@link AspectRatioFrameLayout}. One of {@link #RESIZE_MODE_FIT}, {@link
    * #RESIZE_MODE_FIXED_WIDTH}, {@link #RESIZE_MODE_FIXED_HEIGHT}, {@link #RESIZE_MODE_FILL} or
@@ -52,6 +62,7 @@ public final class AspectRatioFrameLayout extends FrameLayout {
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     RESIZE_MODE_FIT,
     RESIZE_MODE_FIXED_WIDTH,
@@ -61,9 +72,7 @@ public final class AspectRatioFrameLayout extends FrameLayout {
   })
   public @interface ResizeMode {}
 
-  /**
-   * Either the width or height is decreased to obtain the desired aspect ratio.
-   */
+  /** Either the width or height is decreased to obtain the desired aspect ratio. */
   public static final int RESIZE_MODE_FIT = 0;
   /**
    * The width is fixed and the height is increased or decreased to obtain the desired aspect ratio.
@@ -73,15 +82,10 @@ public final class AspectRatioFrameLayout extends FrameLayout {
    * The height is fixed and the width is increased or decreased to obtain the desired aspect ratio.
    */
   public static final int RESIZE_MODE_FIXED_HEIGHT = 2;
-  /**
-   * The specified aspect ratio is ignored.
-   */
+  /** The specified aspect ratio is ignored. */
   public static final int RESIZE_MODE_FILL = 3;
-  /**
-   * Either the width or height is increased to obtain the desired aspect ratio.
-   */
+  /** Either the width or height is increased to obtain the desired aspect ratio. */
   public static final int RESIZE_MODE_ZOOM = 4;
-  // LINT.ThenChange(../../../../../../res/values/attrs.xml)
 
   /**
    * The {@link FrameLayout} will not resize itself if the fractional difference between its natural
@@ -99,7 +103,7 @@ public final class AspectRatioFrameLayout extends FrameLayout {
   @Nullable private AspectRatioListener aspectRatioListener;
 
   private float videoAspectRatio;
-  @ResizeMode private int resizeMode;
+  private @ResizeMode int resizeMode;
 
   public AspectRatioFrameLayout(Context context) {
     this(context, /* attrs= */ null);
@@ -109,8 +113,10 @@ public final class AspectRatioFrameLayout extends FrameLayout {
     super(context, attrs);
     resizeMode = RESIZE_MODE_FIT;
     if (attrs != null) {
-      TypedArray a = context.getTheme().obtainStyledAttributes(attrs,
-          R.styleable.AspectRatioFrameLayout, 0, 0);
+      TypedArray a =
+          context
+              .getTheme()
+              .obtainStyledAttributes(attrs, R.styleable.AspectRatioFrameLayout, 0, 0);
       try {
         resizeMode = a.getInt(R.styleable.AspectRatioFrameLayout_resize_mode, RESIZE_MODE_FIT);
       } finally {
@@ -204,7 +210,8 @@ public final class AspectRatioFrameLayout extends FrameLayout {
         break;
     }
     aspectRatioUpdateDispatcher.scheduleUpdate(videoAspectRatio, viewAspectRatio, true);
-    super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+    super.onMeasure(
+        MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
         MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
   }
 

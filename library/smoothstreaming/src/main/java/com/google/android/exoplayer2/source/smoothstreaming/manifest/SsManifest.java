@@ -33,9 +33,15 @@ import java.util.UUID;
 /**
  * Represents a SmoothStreaming manifest.
  *
- * @see <a href="http://msdn.microsoft.com/en-us/library/ee673436(v=vs.90).aspx">IIS Smooth
- *     Streaming Client Manifest Format</a>
+ * <p>See the <a href="http://msdn.microsoft.com/en-us/library/ee673436(v=vs.90).aspx">IIS Smooth
+ * Streaming Client Manifest Format</a>
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public class SsManifest implements FilterableManifest<SsManifest> {
 
   /** Represents a protection element containing a single header. */
@@ -52,9 +58,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     }
   }
 
-  /**
-   * Represents a StreamIndex element.
-   */
+  /** Represents a StreamIndex element. */
   public static class StreamElement {
 
     private static final String URL_PLACEHOLDER_START_TIME_1 = "{start time}";
@@ -62,7 +66,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     private static final String URL_PLACEHOLDER_BITRATE_1 = "{bitrate}";
     private static final String URL_PLACEHOLDER_BITRATE_2 = "{Bitrate}";
 
-    public final int type;
+    public final @C.TrackType int type;
     public final String subType;
     public final long timescale;
     public final String name;
@@ -84,7 +88,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     public StreamElement(
         String baseUri,
         String chunkTemplate,
-        int type,
+        @C.TrackType int type,
         String subType,
         long timescale,
         String name,
@@ -117,7 +121,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     private StreamElement(
         String baseUri,
         String chunkTemplate,
-        int type,
+        @C.TrackType int type,
         String subType,
         long timescale,
         String name,
@@ -156,9 +160,22 @@ public class SsManifest implements FilterableManifest<SsManifest> {
      * @throws IndexOutOfBoundsException If a key has an invalid index.
      */
     public StreamElement copy(Format[] formats) {
-      return new StreamElement(baseUri, chunkTemplate, type, subType, timescale, name, maxWidth,
-          maxHeight, displayWidth, displayHeight, language, formats, chunkStartTimes,
-          chunkStartTimesUs, lastChunkDurationUs);
+      return new StreamElement(
+          baseUri,
+          chunkTemplate,
+          type,
+          subType,
+          timescale,
+          name,
+          maxWidth,
+          maxHeight,
+          displayWidth,
+          displayHeight,
+          language,
+          formats,
+          chunkStartTimes,
+          chunkStartTimesUs,
+          lastChunkDurationUs);
     }
 
     /**
@@ -188,7 +205,8 @@ public class SsManifest implements FilterableManifest<SsManifest> {
      * @return The duration of the chunk, in microseconds.
      */
     public long getChunkDurationUs(int chunkIndex) {
-      return (chunkIndex == chunkCount - 1) ? lastChunkDurationUs
+      return (chunkIndex == chunkCount - 1)
+          ? lastChunkDurationUs
           : chunkStartTimesUs[chunkIndex + 1] - chunkStartTimesUs[chunkIndex];
     }
 
@@ -205,11 +223,12 @@ public class SsManifest implements FilterableManifest<SsManifest> {
       Assertions.checkState(chunkIndex < chunkStartTimes.size());
       String bitrateString = Integer.toString(formats[track].bitrate);
       String startTimeString = chunkStartTimes.get(chunkIndex).toString();
-      String chunkUrl = chunkTemplate
-          .replace(URL_PLACEHOLDER_BITRATE_1, bitrateString)
-          .replace(URL_PLACEHOLDER_BITRATE_2, bitrateString)
-          .replace(URL_PLACEHOLDER_START_TIME_1, startTimeString)
-          .replace(URL_PLACEHOLDER_START_TIME_2, startTimeString);
+      String chunkUrl =
+          chunkTemplate
+              .replace(URL_PLACEHOLDER_BITRATE_1, bitrateString)
+              .replace(URL_PLACEHOLDER_BITRATE_2, bitrateString)
+              .replace(URL_PLACEHOLDER_START_TIME_1, startTimeString)
+              .replace(URL_PLACEHOLDER_START_TIME_2, startTimeString);
       return UriUtil.resolveToUri(baseUri, chunkUrl);
     }
   }
@@ -326,7 +345,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
         copiedFormats.clear();
       }
       currentStreamElement = streamElement;
-      copiedFormats.add(streamElement.formats[key.trackIndex]);
+      copiedFormats.add(streamElement.formats[key.streamIndex]);
     }
     if (currentStreamElement != null) {
       // Add the last stream element.

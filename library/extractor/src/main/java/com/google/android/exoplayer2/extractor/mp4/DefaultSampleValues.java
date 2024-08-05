@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.extractor.mp4;
 
+@Deprecated
 /* package */ final class DefaultSampleValues {
 
   public final int sampleDescriptionIndex;
@@ -28,5 +29,4 @@ package com.google.android.exoplayer2.extractor.mp4;
     this.size = size;
     this.flags = flags;
   }
-
 }

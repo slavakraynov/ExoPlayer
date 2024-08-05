@@ -15,10 +15,13 @@
  */
 package com.google.android.exoplayer2.source;
 
+import static com.google.android.exoplayer2.util.Assertions.checkStateNotNull;
+
 import android.os.Handler;
 import android.os.Looper;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
@@ -31,7 +34,13 @@ import java.util.HashSet;
  *
  * <p>Whenever an implementing subclass needs to provide a new timeline, it must call {@link
  * #refreshSourceInfo(Timeline)} to notify all listeners.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public abstract class BaseMediaSource implements MediaSource {
 
   private final ArrayList<MediaSourceCaller> mediaSourceCallers;
@@ -41,6 +50,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   @Nullable private Looper looper;
   @Nullable private Timeline timeline;
+  @Nullable private PlayerId playerId;
 
   public BaseMediaSource() {
     mediaSourceCallers = new ArrayList<>(/* initialCapacity= */ 1);
@@ -51,7 +61,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Starts source preparation and enables the source, see {@link #prepareSource(MediaSourceCaller,
-   * TransferListener)}. This method is called at most once until the next call to {@link
+   * TransferListener, PlayerId)}. This method is called at most once until the next call to {@link
    * #releaseSourceInternal()}.
    *
    * @param mediaTransferListener The transfer listener which should be informed of any media data
@@ -95,37 +105,46 @@ public abstract class BaseMediaSource implements MediaSource {
    */
   protected final MediaSourceEventListener.EventDispatcher createEventDispatcher(
       @Nullable MediaPeriodId mediaPeriodId) {
-    return eventDispatcher.withParameters(
-        /* windowIndex= */ 0, mediaPeriodId, /* mediaTimeOffsetMs= */ 0);
+    return eventDispatcher.withParameters(/* windowIndex= */ 0, mediaPeriodId);
   }
 
   /**
    * Returns a {@link MediaSourceEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified {@link MediaPeriodId} and time offset.
-   *
-   * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events.
-   * @param mediaTimeOffsetMs The offset to be added to all media times, in milliseconds.
-   * @return An event dispatcher with pre-configured media period id and time offset.
-   */
-  protected final MediaSourceEventListener.EventDispatcher createEventDispatcher(
-      MediaPeriodId mediaPeriodId, long mediaTimeOffsetMs) {
-    Assertions.checkNotNull(mediaPeriodId);
-    return eventDispatcher.withParameters(/* windowIndex= */ 0, mediaPeriodId, mediaTimeOffsetMs);
-  }
-
-  /**
-   * Returns a {@link MediaSourceEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified window index, {@link MediaPeriodId} and time offset.
+   * registered listeners with the specified window index and {@link MediaPeriodId}.
    *
    * @param windowIndex The timeline window index to be reported with the events.
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events. May be null, if
    *     the events do not belong to a specific media period.
-   * @param mediaTimeOffsetMs The offset to be added to all media times, in milliseconds.
-   * @return An event dispatcher with pre-configured media period id and time offset.
+   * @return An event dispatcher with pre-configured media period id.
    */
   protected final MediaSourceEventListener.EventDispatcher createEventDispatcher(
+      int windowIndex, @Nullable MediaPeriodId mediaPeriodId) {
+    return eventDispatcher.withParameters(windowIndex, mediaPeriodId);
+  }
+
+  /**
+   * Note: The {@code mediaTimeOffsetMs} passed to this method is ignored and not added to media
+   * times in any way.
+   *
+   * @deprecated Use {@link #createEventDispatcher(MediaPeriodId)} instead.
+   */
+  @Deprecated
+  protected final MediaSourceEventListener.EventDispatcher createEventDispatcher(
+      MediaPeriodId mediaPeriodId, long mediaTimeOffsetMs) {
+    Assertions.checkNotNull(mediaPeriodId);
+    return eventDispatcher.withParameters(/* windowIndex= */ 0, mediaPeriodId);
+  }
+
+  /**
+   * Note: The {@code mediaTimeOffsetMs} passed to this method is ignored and not added to media
+   * times in any way.
+   *
+   * @deprecated Use {@link #createEventDispatcher(int, MediaPeriodId)} instead.
+   */
+  @Deprecated
+  protected final MediaSourceEventListener.EventDispatcher createEventDispatcher(
       int windowIndex, @Nullable MediaPeriodId mediaPeriodId, long mediaTimeOffsetMs) {
-    return eventDispatcher.withParameters(windowIndex, mediaPeriodId, mediaTimeOffsetMs);
+    return eventDispatcher.withParameters(windowIndex, mediaPeriodId);
   }
 
   /**
@@ -160,6 +179,16 @@ public abstract class BaseMediaSource implements MediaSource {
     return !enabledMediaSourceCallers.isEmpty();
   }
 
+  /**
+   * Returns the {@link PlayerId} of the player using this media source.
+   *
+   * <p>Must only be used when the media source is {@link #prepareSourceInternal(TransferListener)
+   * prepared}.
+   */
+  protected final PlayerId getPlayerId() {
+    return checkStateNotNull(playerId);
+  }
+
   @Override
   public final void addEventListener(Handler handler, MediaSourceEventListener eventListener) {
     Assertions.checkNotNull(handler);
@@ -184,11 +213,21 @@ public abstract class BaseMediaSource implements MediaSource {
     drmEventDispatcher.removeEventListener(eventListener);
   }
 
+  @SuppressWarnings("deprecation") // Overriding deprecated method to make it final.
   @Override
   public final void prepareSource(
       MediaSourceCaller caller, @Nullable TransferListener mediaTransferListener) {
+    prepareSource(caller, mediaTransferListener, PlayerId.UNSET);
+  }
+
+  @Override
+  public final void prepareSource(
+      MediaSourceCaller caller,
+      @Nullable TransferListener mediaTransferListener,
+      PlayerId playerId) {
     Looper looper = Looper.myLooper();
     Assertions.checkArgument(this.looper == null || this.looper == looper);
+    this.playerId = playerId;
     @Nullable Timeline timeline = this.timeline;
     mediaSourceCallers.add(caller);
     if (this.looper == null) {
@@ -226,6 +265,7 @@ public abstract class BaseMediaSource implements MediaSource {
     if (mediaSourceCallers.isEmpty()) {
       looper = null;
       timeline = null;
+      playerId = null;
       enabledMediaSourceCallers.clear();
       releaseSourceInternal();
     } else {

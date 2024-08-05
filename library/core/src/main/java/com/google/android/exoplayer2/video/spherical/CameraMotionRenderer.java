@@ -30,7 +30,15 @@ import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
 import java.nio.ByteBuffer;
 
-/** A {@link Renderer} that parses the camera motion track. */
+/**
+ * A {@link Renderer} that parses the camera motion track.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class CameraMotionRenderer extends BaseRenderer {
 
   private static final String TAG = "CameraMotionRenderer";
@@ -56,15 +64,15 @@ public final class CameraMotionRenderer extends BaseRenderer {
   }
 
   @Override
-  @Capabilities
-  public int supportsFormat(Format format) {
+  public @Capabilities int supportsFormat(Format format) {
     return MimeTypes.APPLICATION_CAMERA_MOTION.equals(format.sampleMimeType)
         ? RendererCapabilities.create(C.FORMAT_HANDLED)
         : RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE);
   }
 
   @Override
-  public void handleMessage(int messageType, @Nullable Object message) throws ExoPlaybackException {
+  public void handleMessage(@MessageType int messageType, @Nullable Object message)
+      throws ExoPlaybackException {
     if (messageType == MSG_SET_CAMERA_MOTION_LISTENER) {
       listener = (CameraMotionListener) message;
     } else {

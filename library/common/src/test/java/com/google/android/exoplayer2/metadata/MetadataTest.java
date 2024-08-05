@@ -19,7 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import android.os.Parcel;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.google.android.exoplayer2.metadata.id3.BinaryFrame;
+import com.google.android.exoplayer2.testutil.FakeMetadataEntry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -31,7 +31,9 @@ public class MetadataTest {
   public void parcelable() {
     Metadata metadataToParcel =
         new Metadata(
-            new BinaryFrame("id1", new byte[] {1}), new BinaryFrame("id2", new byte[] {2}));
+            /* presentationTimeUs= */ 1_230_000,
+            new FakeMetadataEntry("id1"),
+            new FakeMetadataEntry("id2"));
 
     Parcel parcel = Parcel.obtain();
     metadataToParcel.writeToParcel(parcel, 0);

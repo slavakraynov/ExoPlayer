@@ -23,18 +23,27 @@ import com.google.android.exoplayer2.audio.AudioProcessor;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.DecoderAudioRenderer;
-import com.google.android.exoplayer2.drm.ExoMediaCrypto;
+import com.google.android.exoplayer2.decoder.CryptoConfig;
 import com.google.android.exoplayer2.extractor.FlacStreamMetadata;
-import com.google.android.exoplayer2.util.FlacConstants;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
 
-/** Decodes and renders audio using the native Flac decoder. */
+/**
+ * Decodes and renders audio using the native Flac decoder.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class LibflacAudioRenderer extends DecoderAudioRenderer<FlacDecoder> {
 
   private static final String TAG = "LibflacAudioRenderer";
   private static final int NUM_BUFFERS = 16;
+  private static final int STREAM_MARKER_SIZE = 4;
+  private static final int METADATA_BLOCK_HEADER_SIZE = 4;
 
   public LibflacAudioRenderer() {
     this(/* eventHandler= */ null, /* eventListener= */ null);
@@ -67,10 +76,7 @@ public final class LibflacAudioRenderer extends DecoderAudioRenderer<FlacDecoder
       @Nullable Handler eventHandler,
       @Nullable AudioRendererEventListener eventListener,
       AudioSink audioSink) {
-    super(
-        eventHandler,
-        eventListener,
-        audioSink);
+    super(eventHandler, eventListener, audioSink);
   }
 
   @Override
@@ -79,8 +85,7 @@ public final class LibflacAudioRenderer extends DecoderAudioRenderer<FlacDecoder
   }
 
   @Override
-  @C.FormatSupport
-  protected int supportsFormatInternal(Format format) {
+  protected @C.FormatSupport int supportsFormatInternal(Format format) {
     if (!FlacLibrary.isAvailable()
         || !MimeTypes.AUDIO_FLAC.equalsIgnoreCase(format.sampleMimeType)) {
       return C.FORMAT_UNSUPPORTED_TYPE;
@@ -95,23 +100,23 @@ public final class LibflacAudioRenderer extends DecoderAudioRenderer<FlacDecoder
       outputFormat =
           Util.getPcmFormat(C.ENCODING_PCM_16BIT, format.channelCount, format.sampleRate);
     } else {
-      int streamMetadataOffset =
-          FlacConstants.STREAM_MARKER_SIZE + FlacConstants.METADATA_BLOCK_HEADER_SIZE;
+      int streamMetadataOffset = STREAM_MARKER_SIZE + METADATA_BLOCK_HEADER_SIZE;
       FlacStreamMetadata streamMetadata =
           new FlacStreamMetadata(format.initializationData.get(0), streamMetadataOffset);
       outputFormat = getOutputFormat(streamMetadata);
     }
     if (!sinkSupportsFormat(outputFormat)) {
       return C.FORMAT_UNSUPPORTED_SUBTYPE;
-    } else if (format.exoMediaCryptoType != null) {
+    } else if (format.cryptoType != C.CRYPTO_TYPE_NONE) {
       return C.FORMAT_UNSUPPORTED_DRM;
     } else {
       return C.FORMAT_HANDLED;
     }
   }
 
+  /** {@inheritDoc} */
   @Override
-  protected FlacDecoder createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto)
+  protected FlacDecoder createDecoder(Format format, @Nullable CryptoConfig cryptoConfig)
       throws FlacDecoderException {
     TraceUtil.beginSection("createFlacDecoder");
     FlacDecoder decoder =
@@ -120,6 +125,7 @@ public final class LibflacAudioRenderer extends DecoderAudioRenderer<FlacDecoder
     return decoder;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected Format getOutputFormat(FlacDecoder decoder) {
     return getOutputFormat(decoder.getStreamMetadata());

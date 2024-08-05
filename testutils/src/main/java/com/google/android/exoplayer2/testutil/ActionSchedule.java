@@ -18,13 +18,15 @@ package com.google.android.exoplayer2.testutil;
 import android.os.Looper;
 import android.view.Surface;
 import androidx.annotation.Nullable;
+import androidx.annotation.Size;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.PlayerMessage;
 import com.google.android.exoplayer2.PlayerMessage.Target;
-import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.source.MediaSource;
@@ -54,21 +56,17 @@ import com.google.android.exoplayer2.testutil.Action.WaitForTimelineChanged;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.HandlerWrapper;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Schedules a sequence of {@link Action}s for execution during a test. */
 public final class ActionSchedule {
 
-  /**
-   * Callback to notify listener that the action schedule has finished.
-   */
+  /** Callback to notify listener that the action schedule has finished. */
   public interface Callback {
 
-    /**
-     * Called when action schedule finished executing all its actions.
-     */
+    /** Called when action schedule finished executing all its actions. */
     void onActionScheduleFinished();
-
   }
 
   private final ActionNode rootNode;
@@ -95,7 +93,7 @@ public final class ActionSchedule {
    *     notification is needed.
    */
   /* package */ void start(
-      SimpleExoPlayer player,
+      ExoPlayer player,
       DefaultTrackSelector trackSelector,
       @Nullable Surface surface,
       HandlerWrapper mainHandler,
@@ -104,12 +102,12 @@ public final class ActionSchedule {
     rootNode.schedule(player, trackSelector, surface, mainHandler);
   }
 
-  /**
-   * A builder for {@link ActionSchedule} instances.
-   */
+  /** A builder for {@link ActionSchedule} instances. */
   public static final class Builder {
 
+    @Size(max = 23)
     private final String tag;
+
     private final ActionNode rootNode;
 
     private long currentDelayMs;
@@ -130,6 +128,7 @@ public final class ActionSchedule {
      * @param delayMs The delay in milliseconds.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder delay(long delayMs) {
       currentDelayMs += delayMs;
       return this;
@@ -141,6 +140,7 @@ public final class ActionSchedule {
      * @param action The action to schedule.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder apply(Action action) {
       return appendActionNode(new ActionNode(action, currentDelayMs));
     }
@@ -152,6 +152,7 @@ public final class ActionSchedule {
      * @param intervalMs The interval between each repetition in milliseconds.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder repeat(Action action, long intervalMs) {
       return appendActionNode(new ActionNode(action, currentDelayMs, intervalMs));
     }
@@ -162,6 +163,7 @@ public final class ActionSchedule {
      * @param positionMs The seek position.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder seek(long positionMs) {
       return apply(new Seek(tag, positionMs));
     }
@@ -169,24 +171,27 @@ public final class ActionSchedule {
     /**
      * Schedules a seek action.
      *
-     * @param windowIndex The window to seek to.
+     * @param mediaItemIndex The media item to seek to.
      * @param positionMs The seek position.
      * @return The builder, for convenience.
      */
-    public Builder seek(int windowIndex, long positionMs) {
-      return apply(new Seek(tag, windowIndex, positionMs, /* catchIllegalSeekException= */ false));
+    @CanIgnoreReturnValue
+    public Builder seek(int mediaItemIndex, long positionMs) {
+      return apply(
+          new Seek(tag, mediaItemIndex, positionMs, /* catchIllegalSeekException= */ false));
     }
 
     /**
      * Schedules a seek action to be executed.
      *
-     * @param windowIndex The window to seek to.
+     * @param mediaItemIndex The media item to seek to.
      * @param positionMs The seek position.
      * @param catchIllegalSeekException Whether an illegal seek position should be caught or not.
      * @return The builder, for convenience.
      */
-    public Builder seek(int windowIndex, long positionMs, boolean catchIllegalSeekException) {
-      return apply(new Seek(tag, windowIndex, positionMs, catchIllegalSeekException));
+    @CanIgnoreReturnValue
+    public Builder seek(int mediaItemIndex, long positionMs, boolean catchIllegalSeekException) {
+      return apply(new Seek(tag, mediaItemIndex, positionMs, catchIllegalSeekException));
     }
 
     /**
@@ -208,6 +213,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForPendingPlayerCommands() {
       return apply(new WaitForPendingPlayerCommands(tag));
     }
@@ -219,6 +225,7 @@ public final class ActionSchedule {
      * @return The builder, for convenience.
      * @see Player#setPlaybackParameters(PlaybackParameters)
      */
+    @CanIgnoreReturnValue
     public Builder setPlaybackParameters(PlaybackParameters playbackParameters) {
       return apply(new SetPlaybackParameters(tag, playbackParameters));
     }
@@ -228,18 +235,9 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder stop() {
       return apply(new Stop(tag));
-    }
-
-    /**
-     * Schedules a stop action.
-     *
-     * @param reset Whether the player should be reset.
-     * @return The builder, for convenience.
-     */
-    public Builder stop(boolean reset) {
-      return apply(new Stop(tag, reset));
     }
 
     /**
@@ -247,6 +245,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder play() {
       return apply(new SetPlayWhenReady(tag, true));
     }
@@ -255,23 +254,25 @@ public final class ActionSchedule {
      * Schedules a play action, waits until the player reaches the specified position, and pauses
      * the player again.
      *
-     * @param windowIndex The window index at which the player should be paused again.
-     * @param positionMs The position in that window at which the player should be paused again.
+     * @param mediaItemIndex The media item index at which the player should be paused again.
+     * @param positionMs The position in that media item at which the player should be paused again.
      * @return The builder, for convenience.
      */
-    public Builder playUntilPosition(int windowIndex, long positionMs) {
-      return apply(new PlayUntilPosition(tag, windowIndex, positionMs));
+    @CanIgnoreReturnValue
+    public Builder playUntilPosition(int mediaItemIndex, long positionMs) {
+      return apply(new PlayUntilPosition(tag, mediaItemIndex, positionMs));
     }
 
     /**
-     * Schedules a play action, waits until the player reaches the start of the specified window,
-     * and pauses the player again.
+     * Schedules a play action, waits until the player reaches the start of the specified media
+     * item, and pauses the player again.
      *
-     * @param windowIndex The window index at which the player should be paused again.
+     * @param mediaItemIndex The media item index at which the player should be paused again.
      * @return The builder, for convenience.
      */
-    public Builder playUntilStartOfWindow(int windowIndex) {
-      return apply(new PlayUntilPosition(tag, windowIndex, /* positionMs= */ 0));
+    @CanIgnoreReturnValue
+    public Builder playUntilStartOfMediaItem(int mediaItemIndex) {
+      return apply(new PlayUntilPosition(tag, mediaItemIndex, /* positionMs= */ 0));
     }
 
     /**
@@ -279,6 +280,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder pause() {
       return apply(new SetPlayWhenReady(tag, false));
     }
@@ -288,6 +290,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder enableRenderer(int index) {
       return apply(new SetRendererDisabled(tag, index, false));
     }
@@ -297,6 +300,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder disableRenderer(int index) {
       return apply(new SetRendererDisabled(tag, index, true));
     }
@@ -306,6 +310,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder clearVideoSurface() {
       return apply(new ClearVideoSurface(tag));
     }
@@ -315,6 +320,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setVideoSurface() {
       return apply(new SetVideoSurface(tag));
     }
@@ -324,31 +330,36 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus) {
       return apply(new SetAudioAttributes(tag, audioAttributes, handleAudioFocus));
     }
 
     /**
-     * Schedules a set media items action to be executed.
+     * Schedules a set media source actions to be executed.
      *
-     * @param windowIndex The window index to start playback from or {@link C#INDEX_UNSET} if the
-     *     playback position should not be reset.
+     * @param mediaItemIndex The media item index to start playback from or {@link C#INDEX_UNSET} if
+     *     the playback position should not be reset.
      * @param positionMs The position in milliseconds from where playback should start. If {@link
-     *     C#TIME_UNSET} is passed the default position is used. In any case, if {@code windowIndex}
-     *     is set to {@link C#INDEX_UNSET} the position is not reset at all and this parameter is
-     *     ignored.
+     *     C#TIME_UNSET} is passed the default position is used. In any case, if {@code
+     *     mediaItemIndex} is set to {@link C#INDEX_UNSET} the position is not reset at all and this
+     *     parameter is ignored.
+     * @param sources The media sources to be set on the player.
      * @return The builder, for convenience.
      */
-    public Builder setMediaSources(int windowIndex, long positionMs, MediaSource... sources) {
-      return apply(new Action.SetMediaItems(tag, windowIndex, positionMs, sources));
+    @CanIgnoreReturnValue
+    public Builder setMediaSources(int mediaItemIndex, long positionMs, MediaSource... sources) {
+      return apply(new Action.SetMediaItems(tag, mediaItemIndex, positionMs, sources));
     }
 
     /**
-     * Schedules a set media items action to be executed.
+     * Schedules a set media sources action to be executed.
      *
      * @param resetPosition Whether the playback position should be reset.
+     * @param sources The media sources to be set on the player.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setMediaSources(boolean resetPosition, MediaSource... sources) {
       return apply(new Action.SetMediaItemsResetPosition(tag, resetPosition, sources));
     }
@@ -359,10 +370,14 @@ public final class ActionSchedule {
      * @param mediaSources The media sources to add.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setMediaSources(MediaSource... mediaSources) {
       return apply(
           new Action.SetMediaItems(
-              tag, /* windowIndex= */ C.INDEX_UNSET, /* positionMs= */ C.TIME_UNSET, mediaSources));
+              tag,
+              /* mediaItemIndex= */ C.INDEX_UNSET,
+              /* positionMs= */ C.TIME_UNSET,
+              mediaSources));
     }
     /**
      * Schedules a add media items action to be executed.
@@ -370,6 +385,7 @@ public final class ActionSchedule {
      * @param mediaSources The media sources to add.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder addMediaSources(MediaSource... mediaSources) {
       return apply(new Action.AddMediaItems(tag, mediaSources));
     }
@@ -381,6 +397,7 @@ public final class ActionSchedule {
      * @param newIndex The index after the item has been moved.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder moveMediaItem(int currentIndex, int newIndex) {
       return apply(new Action.MoveMediaItem(tag, currentIndex, newIndex));
     }
@@ -391,6 +408,7 @@ public final class ActionSchedule {
      * @param index The index of the media item to be removed.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder removeMediaItem(int index) {
       return apply(new Action.RemoveMediaItem(tag, index));
     }
@@ -402,6 +420,7 @@ public final class ActionSchedule {
      * @param toIndex The end of the range of media items to be removed (exclusive).
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder removeMediaItems(int fromIndex, int toIndex) {
       return apply(new Action.RemoveMediaItems(tag, fromIndex, toIndex));
     }
@@ -411,6 +430,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder prepare() {
       return apply(new Action.Prepare(tag));
     }
@@ -420,6 +440,7 @@ public final class ActionSchedule {
      *
      * @return The builder. for convenience,
      */
+    @CanIgnoreReturnValue
     public Builder clearMediaItems() {
       return apply(new Action.ClearMediaItems(tag));
     }
@@ -429,6 +450,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setRepeatMode(@Player.RepeatMode int repeatMode) {
       return apply(new SetRepeatMode(tag, repeatMode));
     }
@@ -439,6 +461,7 @@ public final class ActionSchedule {
      * @param shuffleOrder The shuffle order.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setShuffleOrder(ShuffleOrder shuffleOrder) {
       return apply(new SetShuffleOrder(tag, shuffleOrder));
     }
@@ -448,6 +471,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setShuffleModeEnabled(boolean shuffleModeEnabled) {
       return apply(new SetShuffleModeEnabled(tag, shuffleModeEnabled));
     }
@@ -455,10 +479,12 @@ public final class ActionSchedule {
     /**
      * Schedules sending a {@link PlayerMessage}.
      *
-     * @param positionMs The position in the current window at which the message should be sent, in
-     *     milliseconds.
+     * @param target A message target.
+     * @param positionMs The position in the current media item at which the message should be sent,
+     *     in milliseconds.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder sendMessage(Target target, long positionMs) {
       return apply(new SendMessages(tag, target, positionMs));
     }
@@ -467,27 +493,30 @@ public final class ActionSchedule {
      * Schedules sending a {@link PlayerMessage}.
      *
      * @param target A message target.
-     * @param windowIndex The window index at which the message should be sent.
+     * @param mediaItemIndex The media item index at which the message should be sent.
      * @param positionMs The position at which the message should be sent, in milliseconds.
      * @return The builder, for convenience.
      */
-    public Builder sendMessage(Target target, int windowIndex, long positionMs) {
+    @CanIgnoreReturnValue
+    public Builder sendMessage(Target target, int mediaItemIndex, long positionMs) {
       return apply(
-          new SendMessages(tag, target, windowIndex, positionMs, /* deleteAfterDelivery= */ true));
+          new SendMessages(
+              tag, target, mediaItemIndex, positionMs, /* deleteAfterDelivery= */ true));
     }
 
     /**
      * Schedules to send a {@link PlayerMessage}.
      *
      * @param target A message target.
-     * @param windowIndex The window index at which the message should be sent.
+     * @param mediaItemIndex The media item index at which the message should be sent.
      * @param positionMs The position at which the message should be sent, in milliseconds.
      * @param deleteAfterDelivery Whether the message will be deleted after delivery.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder sendMessage(
-        Target target, int windowIndex, long positionMs, boolean deleteAfterDelivery) {
-      return apply(new SendMessages(tag, target, windowIndex, positionMs, deleteAfterDelivery));
+        Target target, int mediaItemIndex, long positionMs, boolean deleteAfterDelivery) {
+      return apply(new SendMessages(tag, target, mediaItemIndex, positionMs, deleteAfterDelivery));
     }
 
     /**
@@ -495,6 +524,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForTimelineChanged() {
       return apply(new WaitForTimelineChanged(tag));
     }
@@ -506,6 +536,7 @@ public final class ActionSchedule {
      * @param expectedReason The expected reason of the timeline change.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForTimelineChanged(
         Timeline expectedTimeline, @Player.TimelineChangeReason int expectedReason) {
       return apply(new WaitForTimelineChanged(tag, expectedTimeline, expectedReason));
@@ -516,6 +547,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForPositionDiscontinuity() {
       return apply(new WaitForPositionDiscontinuity(tag));
     }
@@ -526,6 +558,7 @@ public final class ActionSchedule {
      * @param targetPlayWhenReady The target playWhenReady value.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForPlayWhenReady(boolean targetPlayWhenReady) {
       return apply(new WaitForPlayWhenReady(tag, targetPlayWhenReady));
     }
@@ -536,6 +569,7 @@ public final class ActionSchedule {
      * @param targetPlaybackState The target playback state.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForPlaybackState(@Player.State int targetPlaybackState) {
       return apply(new WaitForPlaybackState(tag, targetPlaybackState));
     }
@@ -546,6 +580,7 @@ public final class ActionSchedule {
      * @param targetIsLoading The target value of {@code player.isLoading()}.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForIsLoading(boolean targetIsLoading) {
       return apply(new WaitForIsLoading(tag, targetIsLoading));
     }
@@ -556,6 +591,7 @@ public final class ActionSchedule {
      * @param playerTarget The target to observe.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder waitForMessage(PlayerTarget playerTarget) {
       return apply(new WaitForMessage(tag, playerTarget));
     }
@@ -565,6 +601,7 @@ public final class ActionSchedule {
      *
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder executeRunnable(Runnable runnable) {
       return apply(new ExecuteRunnable(tag, runnable));
     }
@@ -575,6 +612,7 @@ public final class ActionSchedule {
      * @param exception The exception to throw.
      * @return The builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder throwPlaybackException(ExoPlaybackException exception) {
       return apply(new ThrowPlaybackException(tag, exception));
     }
@@ -586,6 +624,7 @@ public final class ActionSchedule {
       return new ActionSchedule(rootNode, callbackAction);
     }
 
+    @CanIgnoreReturnValue
     private Builder appendActionNode(ActionNode actionNode) {
       previousNode.setNext(actionNode);
       previousNode = actionNode;
@@ -609,7 +648,7 @@ public final class ActionSchedule {
       void onMessageArrived();
     }
 
-    @Nullable private SimpleExoPlayer player;
+    @Nullable private ExoPlayer player;
     private boolean hasArrived;
     @Nullable private Callback callback;
 
@@ -621,21 +660,21 @@ public final class ActionSchedule {
     }
 
     /** Handles the message send to the component and additionally provides access to the player. */
-    public abstract void handleMessage(
-        SimpleExoPlayer player, int messageType, @Nullable Object message);
-
-    /** Sets the player to be passed to {@link #handleMessage(SimpleExoPlayer, int, Object)}. */
-    /* package */ void setPlayer(SimpleExoPlayer player) {
-      this.player = player;
-    }
+    public abstract void handleMessage(ExoPlayer player, int messageType, @Nullable Object message);
 
     @Override
-    public final void handleMessage(int messageType, @Nullable Object message) {
+    public final void handleMessage(
+        @Renderer.MessageType int messageType, @Nullable Object message) {
       handleMessage(Assertions.checkStateNotNull(player), messageType, message);
       if (callback != null) {
         hasArrived = true;
         callback.onMessageArrived();
       }
+    }
+
+    /** Sets the player to be passed to {@link #handleMessage(ExoPlayer, int, Object)}. */
+    /* package */ void setPlayer(ExoPlayer player) {
+      this.player = player;
     }
   }
 
@@ -645,19 +684,19 @@ public final class ActionSchedule {
    */
   public abstract static class PlayerRunnable implements Runnable {
 
-    @Nullable private SimpleExoPlayer player;
+    @Nullable private ExoPlayer player;
 
     /** Executes Runnable with reference to player. */
-    public abstract void run(SimpleExoPlayer player);
-
-    /** Sets the player to be passed to {@link #run(SimpleExoPlayer)} . */
-    /* package */ void setPlayer(SimpleExoPlayer player) {
-      this.player = player;
-    }
+    public abstract void run(ExoPlayer player);
 
     @Override
     public final void run() {
       run(Assertions.checkStateNotNull(player));
+    }
+
+    /** Sets the player to be passed to {@link #run(ExoPlayer)} . */
+    /* package */ void setPlayer(ExoPlayer player) {
+      this.player = player;
     }
   }
 
@@ -670,7 +709,7 @@ public final class ActionSchedule {
 
     @Nullable private ActionNode next;
 
-    private @MonotonicNonNull SimpleExoPlayer player;
+    private @MonotonicNonNull ExoPlayer player;
     private @MonotonicNonNull DefaultTrackSelector trackSelector;
     @Nullable private Surface surface;
     private @MonotonicNonNull HandlerWrapper mainHandler;
@@ -714,7 +753,7 @@ public final class ActionSchedule {
      * @param mainHandler A handler associated with the main thread of the host activity.
      */
     public void schedule(
-        SimpleExoPlayer player,
+        ExoPlayer player,
         DefaultTrackSelector trackSelector,
         @Nullable Surface surface,
         HandlerWrapper mainHandler) {
@@ -750,33 +789,28 @@ public final class ActionSchedule {
             repeatIntervalMs);
       }
     }
-
   }
 
-  /**
-   * A no-op root action.
-   */
+  /** A no-op root action. */
   private static final class RootAction extends Action {
 
-    public RootAction(String tag) {
+    public RootAction(@Size(max = 23) String tag) {
       super(tag, "Root");
     }
 
     @Override
     protected void doActionImpl(
-        SimpleExoPlayer player, DefaultTrackSelector trackSelector, @Nullable Surface surface) {
+        ExoPlayer player, DefaultTrackSelector trackSelector, @Nullable Surface surface) {
       // Do nothing.
     }
   }
 
-  /**
-   * An action calling a specified {@link ActionSchedule.Callback}.
-   */
+  /** An action calling a specified {@link ActionSchedule.Callback}. */
   private static final class CallbackAction extends Action {
 
     @Nullable private Callback callback;
 
-    public CallbackAction(String tag) {
+    public CallbackAction(@Size(max = 23) String tag) {
       super(tag, "FinishedCallback");
     }
 
@@ -785,8 +819,14 @@ public final class ActionSchedule {
     }
 
     @Override
-    protected void doActionAndScheduleNextImpl(
-        SimpleExoPlayer player,
+    protected void doActionImpl(
+        ExoPlayer player, DefaultTrackSelector trackSelector, @Nullable Surface surface) {
+      // Not triggered.
+    }
+
+    @Override
+    /* package */ void doActionAndScheduleNextImpl(
+        ExoPlayer player,
         DefaultTrackSelector trackSelector,
         @Nullable Surface surface,
         HandlerWrapper handler,
@@ -797,12 +837,5 @@ public final class ActionSchedule {
         handler.post(callback::onActionScheduleFinished);
       }
     }
-
-    @Override
-    protected void doActionImpl(
-        SimpleExoPlayer player, DefaultTrackSelector trackSelector, @Nullable Surface surface) {
-      // Not triggered.
-    }
   }
-
 }

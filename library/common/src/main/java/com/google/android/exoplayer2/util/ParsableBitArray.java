@@ -20,7 +20,15 @@ import static java.lang.Math.min;
 import com.google.common.base.Charsets;
 import java.nio.charset.Charset;
 
-/** Wraps a byte array, providing methods that allow it to be read as a bitstream. */
+/**
+ * Wraps a byte array, providing methods that allow it to be read as a bitstream.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public final class ParsableBitArray {
 
   public byte[] data;
@@ -89,16 +97,12 @@ public final class ParsableBitArray {
     byteLimit = limit;
   }
 
-  /**
-   * Returns the number of bits yet to be read.
-   */
+  /** Returns the number of bits yet to be read. */
   public int bitsLeft() {
     return (byteLimit - byteOffset) * 8 - bitOffset;
   }
 
-  /**
-   * Returns the current bit offset.
-   */
+  /** Returns the current bit offset. */
   public int getPosition() {
     return byteOffset * 8 + bitOffset;
   }
@@ -124,9 +128,7 @@ public final class ParsableBitArray {
     assertValidOffset();
   }
 
-  /**
-   * Skips a single bit.
-   */
+  /** Skips a single bit. */
   public void skipBit() {
     if (++bitOffset == 8) {
       bitOffset = 0;
@@ -344,8 +346,7 @@ public final class ParsableBitArray {
 
   private void assertValidOffset() {
     // It is fine for position to be at the end of the array, but no further.
-    Assertions.checkState(byteOffset >= 0
-        && (byteOffset < byteLimit || (byteOffset == byteLimit && bitOffset == 0)));
+    Assertions.checkState(
+        byteOffset >= 0 && (byteOffset < byteLimit || (byteOffset == byteLimit && bitOffset == 0)));
   }
-
 }

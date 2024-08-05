@@ -23,12 +23,19 @@ import java.util.Random;
  * Shuffled order of indices.
  *
  * <p>The shuffle order must be immutable to ensure thread safety.
+ *
+ * <p>The order must be consistent when traversed both {@linkplain #getNextIndex(int) forwards} and
+ * {@linkplain #getPreviousIndex(int) backwards}.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
  */
+@Deprecated
 public interface ShuffleOrder {
 
-  /**
-   * The default {@link ShuffleOrder} implementation for random shuffle order.
-   */
+  /** The default {@link ShuffleOrder} implementation for random shuffle order. */
   class DefaultShuffleOrder implements ShuffleOrder {
 
     private final Random random;
@@ -164,12 +171,9 @@ public interface ShuffleOrder {
       }
       return shuffled;
     }
-
   }
 
-  /**
-   * A {@link ShuffleOrder} implementation which does not shuffle.
-   */
+  /** A {@link ShuffleOrder} implementation which does not shuffle. */
   final class UnshuffledShuffleOrder implements ShuffleOrder {
 
     private final int length;
@@ -224,9 +228,7 @@ public interface ShuffleOrder {
     }
   }
 
-  /**
-   * Returns length of shuffle order.
-   */
+  /** Returns length of shuffle order. */
   int getLength();
 
   /**

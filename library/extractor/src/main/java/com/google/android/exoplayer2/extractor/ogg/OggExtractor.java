@@ -31,7 +31,15 @@ import java.io.IOException;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** Extracts data from the Ogg container format. */
+/**
+ * Extracts data from the Ogg container format.
+ *
+ * @deprecated com.google.android.exoplayer2 is deprecated. Please migrate to androidx.media3 (which
+ *     contains the same ExoPlayer code). See <a
+ *     href="https://developer.android.com/guide/topics/media/media3/getting-started/migration-guide">the
+ *     migration guide</a> for more details, including a script to help with the migration.
+ */
+@Deprecated
 public class OggExtractor implements Extractor {
 
   /** Factory for {@link OggExtractor} instances. */
@@ -74,7 +82,8 @@ public class OggExtractor implements Extractor {
     checkStateNotNull(output); // Check that init has been called.
     if (streamReader == null) {
       if (!sniffInternal(input)) {
-        throw new ParserException("Failed to determine bitstream type");
+        throw ParserException.createForMalformedContainer(
+            "Failed to determine bitstream type", /* cause= */ null);
       }
       input.resetPeekPosition();
     }
@@ -114,5 +123,4 @@ public class OggExtractor implements Extractor {
     scratch.setPosition(0);
     return scratch;
   }
-
 }
